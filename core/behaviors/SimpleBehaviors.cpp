@@ -235,13 +235,35 @@ bool namesCampfire(std::string_view name)
 
 } // namespace
 
+bool CampfireBehavior::isCampfire(const GameObjectState& object)
+{
+    return (object.kind == GameObjectKind::Generic || object.kind == GameObjectKind::Unknown) && namesCampfire(object.name);
+}
+
+std::vector<const GameObjectState*> CampfireBehavior::campItems(const GameSnapshot& s, const GameObjectState& fire)
+{
+    // A Sharpening Wheel stood 2.5 yd from Goldshire's (it gave Extra Strength).
+    constexpr float kCampReach = 10.0f;
+    std::vector<const GameObjectState*> out;
+
+    for (const auto& g : s.objects)
+    {
+        if (g.createdBy != 0 && g.kind != GameObjectKind::FishingBobber && !namesCampfire(g.name) && distance2D(g.position, fire.position) <= kCampReach)
+        {
+            out.push_back(&g);
+        }
+    }
+
+    return out;
+}
+
 const GameObjectState* CampfireBehavior::campfireInSight(const GameSnapshot& s, const BotContext& ctx)
 {
     const GameObjectState* best = nullptr;
 
     for (const auto& g : s.objects)
     {
-        if ((g.kind != GameObjectKind::Generic && g.kind != GameObjectKind::Unknown) || !namesCampfire(g.name) || ctx.objectBlacklist.contains(g.guid))
+        if (!isCampfire(g) || ctx.objectBlacklist.contains(g.guid) || campItems(s, g).empty())
         {
             continue;
         }
@@ -283,7 +305,14 @@ void CampfireBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
 
     if (fire_ == 0)
     {
-        ctx.log.info(logcat::Rest, "{} {:.0f} yd off - sitting down by it for Camp Benefits", fire->name, distance2D(fire->position, s.player.position));
+        std::string items;
+
+        for (const auto* item : campItems(s, *fire))
+        {
+            items += (items.empty() ? "" : ", ") + item->name;
+        }
+
+        ctx.log.info(logcat::Rest, "{} {:.0f} yd off, {} by it - sitting down there for Camp Benefits", fire->name, distance2D(fire->position, s.player.position), items.empty() ? std::string("?") : items);
     }
 
     fire_ = fire->guid;

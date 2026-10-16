@@ -92,10 +92,12 @@ private:
 
 // 610, Sit down at campfires (WoW Forever): sat by a campfire for a minute -
 // Welcoming Campfire counts it down - the character gets Camp Benefits and a
-// stat for an hour. Without Camp Benefits and a campfire in sight, the bot
-// walks up to it, as near as it does not burn, types /sit, and waits for the
-// minute to run out (or Welcoming Campfire to start over). A campfire that
-// gives no Welcoming Campfire is left alone for half an hour.
+// stat for an hour - of what players have put up by it (a tent, a Sharpening
+// Wheel): a bare campfire is passed by. Without Camp Benefits and such a
+// campfire in sight, the bot walks up to it, as near as it does not burn,
+// types /sit, and waits for the minute to run out (or Welcoming Campfire to
+// start over). A campfire that gives no Welcoming Campfire is left alone for
+// half an hour.
 class CampfireBehavior final : public IBotBehavior
 {
 public:
@@ -114,8 +116,13 @@ public:
     BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
     void onExit(BotContext& ctx) override;
 
-    // The nearest campfire in sight not left alone.
+    // The nearest campfire in sight not left alone, with something put up by it.
     static const GameObjectState* campfireInSight(const GameSnapshot& s, const BotContext& ctx);
+    // A campfire ("Basic Campfire", "Campfire"), by its name.
+    static bool isCampfire(const GameObjectState& object);
+    // What players have put up by the fire - a tent, a Sharpening Wheel:
+    // Camp Benefits comes of those; a bare campfire gives none.
+    static std::vector<const GameObjectState*> campItems(const GameSnapshot& s, const GameObjectState& fire);
 
 private:
     enum class Phase
