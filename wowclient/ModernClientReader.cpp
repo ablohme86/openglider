@@ -875,12 +875,16 @@ std::vector<ModernActionSlot> ModernClientReader::actionBars() const
         const std::uint32_t id = raw[static_cast<std::size_t>(slot) * 2];
         const std::uint32_t flags = raw[static_cast<std::size_t>(slot) * 2 + 1];
 
-        if (id == 0)
+        // A kind of action other than a spell, an item or a macro: not a
+        // spell by that id, and nothing the bot presses.
+        const std::uint32_t kind = flags & modern::ActionFlagTypeMask;
+
+        if (id == 0 || (kind != 0 && kind != modern::ActionFlagItem && kind != modern::ActionFlagMacro))
         {
             continue;
         }
 
-        out.push_back({slot + 1, id, (flags & modern::ActionFlagItem) != 0, (flags & modern::ActionFlagMacro) != 0});
+        out.push_back({slot + 1, id, kind == modern::ActionFlagItem, kind == modern::ActionFlagMacro});
     }
 
     return out;
