@@ -972,6 +972,19 @@ bool QuestSource::isDungeonQuest(std::uint32_t questId) const
     return false;
 }
 
+bool QuestSource::isCampingQuest(std::uint32_t questId) const
+{
+    const auto it = quests_.find(questId);
+
+    if (it == quests_.end())
+    {
+        return false;
+    }
+
+    const std::string& name = it->second.name;
+    return name == "The Adventurer" || name == "The Great Outdoors" || name.starts_with("Camping 101:");
+}
+
 bool QuestSource::isEliteQuest(std::uint32_t questId) const
 {
     const auto it = quests_.find(questId);
@@ -1254,9 +1267,9 @@ std::vector<std::string> QuestSource::offers(const GameSnapshot& s, std::uint32_
     for (const auto* q : givers_.offers(npcEntry, who))
     {
         // Elite quests may be accepted and left in the quest log; their
-        // objectives are still auto-ignored once active. Dungeon quests are
-        // excluded from pickup as well as execution.
-        if (questInStartZone(q->id) && !ignoredQuests_.contains(q->id) && !isDungeonQuest(q->id))
+        // objectives are still auto-ignored once active. Dungeon and camping
+        // quests are excluded from pickup as well as execution.
+        if (questInStartZone(q->id) && !ignoredQuests_.contains(q->id) && !isDungeonQuest(q->id) && !isCampingQuest(q->id))
         {
             out.push_back(q->name);
         }
@@ -1286,9 +1299,9 @@ std::optional<std::uint32_t> QuestSource::questStartedByItem(const GameSnapshot&
     who.strict = false;
     who.anyRaceOrClass = false;
     const auto* q = givers_.itemOffer(itemId, who);
-    // As with NPC offers, allow elite quest starters but keep dungeon quests
-    // out; active elite quests are filtered from execution in targets().
-    if (!q || ignoredQuests_.contains(q->id) || isDungeonQuest(q->id))
+    // As with NPC offers, allow elite quest starters but keep dungeon and
+    // camping quests out; active elite quests are filtered from execution in targets().
+    if (!q || ignoredQuests_.contains(q->id) || isDungeonQuest(q->id) || isCampingQuest(q->id))
     {
         return std::nullopt;
     }

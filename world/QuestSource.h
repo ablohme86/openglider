@@ -103,9 +103,13 @@ public:
     std::optional<std::uint32_t> questStartedByItem(const GameSnapshot& snapshot, std::uint32_t itemId) override;
     bool isDungeonQuest(std::uint32_t questId) const override;
     bool isEliteQuest(std::uint32_t questId) const override;
+    // The starting zones' profession introduction: "The Adventurer" leads to
+    // "The Great Outdoors" and that to "Camping 101: Cooking" (and the other
+    // professions). Talking to trainers the bot has no use for.
+    bool isCampingQuest(std::uint32_t questId) const;
     bool isAutoIgnored(std::uint32_t questId) const override
     {
-        return isDungeonQuest(questId) || isEliteQuest(questId);
+        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId);
     }
     void setEliteEntries(std::shared_ptr<const std::unordered_set<std::uint32_t>> entries) override
     {
