@@ -53,8 +53,7 @@ directory are told to the engine by the program (`setApplicationName`,
 
 [docs/CustomEngine.md](docs/CustomEngine.md) is the full guide: running a
 program with your build, which changes work and which do not, where things
-are, recipes, and how the check works. AllGlider has the engine compiled in
-and does not run with another.
+are, recipes, and how the check works.
 
 ## License
 

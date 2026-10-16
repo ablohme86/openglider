@@ -48,7 +48,7 @@ function(og_add_module name)
     endif()
 
     set_property(GLOBAL APPEND PROPERTY OG_ENGINE_MODULES ${target})
-    add_library(AllGlider::${name} ALIAS ${target})
+    add_library(OpenGlider::${name} ALIAS ${target})
     target_include_directories(${target} PUBLIC ${OG_INCLUDE_ROOT})
     target_compile_features(${target} PUBLIC cxx_std_20)
     if(ARG_DEPS)

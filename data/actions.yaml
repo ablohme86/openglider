@@ -1,7 +1,7 @@
 # How the actions the combat classes name behave.
 #
 # Combat classes say *what* to do ("Warrior.Rend"). The key it is pressed with
-# comes from your action bars: AllGlider reads them when it attaches, and moves,
+# comes from your action bars: the bot reads them when it attaches, and moves,
 # jumps and targets on the keys your character has for that. This file only
 # says what the action bars cannot tell:
 #

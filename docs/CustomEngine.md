@@ -7,10 +7,6 @@ and run with it, and you can change OpenGlider and build it again for them.
 This guide covers how to build it, how a program runs with a build, which
 changes a program built against the headers survives, and why.
 
-> **AllGlider** has the engine compiled into it and runs with no other: it
-> refuses an OpenGlider library that is not its own build. This guide is for
-> programs of your own.
-
 - [Quick start](#quick-start)
 - [Running a program with your build](#running-a-program-with-your-build)
 - [Which changes work](#which-changes-work)
@@ -315,7 +311,7 @@ authenticate it.
 
 The engine looks for its files in the user's config directory, beside the
 program, and in a data directory. The program names these at start with
-`setApplicationName()` (AllGlider's settings live in `~/.config/allglider/`,
+`setApplicationName()` (a program called MyBot keeps its settings in `~/.config/mybot/`,
 not `~/.config/openglider/`) and `setDataDirectory()`. A library built on its
 own does not know them.
 
