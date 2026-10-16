@@ -27,21 +27,6 @@ modules it lists as dependencies:
 | `wowclient`  | reading the client's memory (1.12.1 and 3.3.5a layouts)        |
 | `minimap`    | the client's minimap tiles (with StormLib or CascLib)          |
 
-Headers are included as `"og/<module>/Header.h"`, so the repository is checked
-out as a directory named `og`, for example as a `src/og` submodule.
-
-## Building
-
-`CMakeLists.txt` adds the modules to a parent CMake project, which provides
-`og_add_module` and the dependencies: yaml-cpp, Recast/Detour, SQLite, OpenSSL,
-and optionally StormLib or CascLib. The parent sets `OG_APP_NAME` before
-`add_subdirectory(og)` to name its config and runtime directories
-(`~/.config/<app>`, `%APPDATA%/<App>`); it is `OpenGlider` otherwise.
-
-Client layouts other than 1.12.1 and 3.3.5a are not part of OpenGlider. A build
-that has them adds their sources to `og_wowclient` and defines
-`OG_EMBED_MODERN_LAYOUTS`; otherwise they can be registered at run time from
-JSON (`registerLayout`).
 
 ## License
 
