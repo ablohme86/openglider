@@ -42,22 +42,14 @@ namespace og
 // below do not show: a virtual function added, a field moved.
 inline constexpr std::uint32_t kEngineAbiVersion = 1;
 
-// The sizes and alignments of the types a program shares with the engine, as
+// The size and alignment of each type a program shares with the engine, as
 // the headers at hand make them. A field added to one changes it.
-constexpr std::uint64_t engineAbiFingerprint()
+template <typename... Types>
+constexpr std::uint64_t layoutFingerprint()
 {
     std::uint64_t hash = 1469598103934665603ull; // FNV-1a
 
-    for (const std::uint64_t value : {std::uint64_t{kEngineAbiVersion},
-                                      std::uint64_t{sizeof(GameSnapshot)}, std::uint64_t{alignof(GameSnapshot)},
-                                      std::uint64_t{sizeof(PlayerState)}, std::uint64_t{sizeof(UnitState)},
-                                      std::uint64_t{sizeof(GameObjectState)}, std::uint64_t{sizeof(BotConfig)},
-                                      std::uint64_t{sizeof(BotContext)}, std::uint64_t{sizeof(BotEngine)},
-                                      std::uint64_t{sizeof(BotInstance)}, std::uint64_t{sizeof(InstanceStatus)},
-                                      std::uint64_t{sizeof(GliderProfile)}, std::uint64_t{sizeof(ProfileEditor)},
-                                      std::uint64_t{sizeof(QuestSource)}, std::uint64_t{sizeof(wowclient::ClientLayout)},
-                                      std::uint64_t{sizeof(wowclient::ModernLayout)},
-                                      std::uint64_t{sizeof(wowclient::WowMemoryStateProvider)}})
+    for (const std::uint64_t value : {std::uint64_t{kEngineAbiVersion}, (std::uint64_t{sizeof(Types)} << 8 | std::uint64_t{alignof(Types)})...})
     {
         for (int i = 0; i < 8; ++i)
         {
@@ -67,6 +59,12 @@ constexpr std::uint64_t engineAbiFingerprint()
     }
 
     return hash;
+}
+
+constexpr std::uint64_t engineAbiFingerprint()
+{
+    return layoutFingerprint<GameSnapshot, PlayerState, UnitState, GameObjectState, BotConfig, BotContext, BotEngine, BotInstance, InstanceStatus, GliderProfile, ProfileEditor,
+                             QuestSource, wowclient::ClientLayout, wowclient::ModernLayout, wowclient::WowMemoryStateProvider>();
 }
 
 // What the engine running says of itself.
