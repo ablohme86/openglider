@@ -80,11 +80,25 @@ if(OG_WITH_MINIMAP)
         message(STATUS "StormLib not found on system, fetching")
         set(STORM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
         set(STORM_UNICODE OFF CACHE BOOL "" FORCE)
-        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
         FetchContent_Declare(stormlib
             GIT_REPOSITORY https://github.com/ladislav-zezula/StormLib.git
             GIT_TAG v9.25)
+        # Static, for StormLib alone: a normal variable its option() takes
+        # (CMP0077), never the cache of the project OpenGlider is built in.
+        if(DEFINED BUILD_SHARED_LIBS)
+            set(og_shared_libs_before "${BUILD_SHARED_LIBS}")
+        endif()
+        set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+        set(BUILD_SHARED_LIBS OFF)
         FetchContent_MakeAvailable(stormlib)
+        unset(CMAKE_POLICY_DEFAULT_CMP0077)
+
+        if(DEFINED og_shared_libs_before)
+            set(BUILD_SHARED_LIBS "${og_shared_libs_before}")
+            unset(og_shared_libs_before)
+        else()
+            unset(BUILD_SHARED_LIBS)
+        endif()
     endif()
     if(TARGET storm)
         set(OG_STORM_TARGET storm)
