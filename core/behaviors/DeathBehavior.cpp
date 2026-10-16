@@ -22,6 +22,7 @@
 #include "og/state/IGameStateProvider.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -118,6 +119,7 @@ void DeathBehavior::onEnter(const GameSnapshot&, BotContext& ctx)
     approachRetryAt_.reset();
     safeSpot_.reset();
     safeSpotGivenUp_ = false;
+    campedSince_.reset();
     warnedNoCorpse_ = false;
     ghostSince_.reset();
     lastGhostPosition_.reset();
@@ -177,18 +179,22 @@ void DeathBehavior::buildGhostPath(const Vec3& from, const Vec3& corpse, BotCont
 
 Vec3 DeathBehavior::findSafeSpot(const Vec3& corpse, const GameSnapshot& s, BotContext& ctx) const
 {
-    const float radius = ctx.config.resurrectRange * 0.8f;
+    // The whole of resurrect range, ring by ring: the corpse, then 16 ways
+    // out at a third, three fifths, four fifths and nearly all of it.
+    constexpr int kWays = 16;
+    const float reach = std::max(2.0f, ctx.config.resurrectRange - 1.0f);
     Vec3 best = corpse;
     float bestScore = -1.0f;
 
-    for (int i = 0; i <= 12; ++i)
+    for (int i = 0; i <= 4 * kWays; ++i)
     {
         Vec3 candidate = corpse;
 
         if (i > 0)
         {
-            const float a = static_cast<float>(i - 1) * kTwoPi / 12.0f;
-            candidate = corpse + Vec3{std::cos(a) * radius, std::sin(a) * radius, 0.0f};
+            const float share = std::array{0.35f, 0.6f, 0.8f, 1.0f}[static_cast<std::size_t>((i - 1) / kWays)];
+            const float a = static_cast<float>((i - 1) % kWays) * kTwoPi / static_cast<float>(kWays);
+            candidate = corpse + Vec3{std::cos(a) * reach * share, std::sin(a) * reach * share, 0.0f};
         }
 
         if (ctx.areaBlacklist.contains(candidate) || !ctx.navigator.canStandAt(candidate))
@@ -526,6 +532,7 @@ BehaviorStatus DeathBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         approachRetryAt_.reset();
         safeSpot_.reset();
         safeSpotGivenUp_ = false;
+        campedSince_.reset();
         lastRetrieve_.reset();
         stillAt_.reset();
         detours_.abandon();
@@ -574,49 +581,68 @@ BehaviorStatus DeathBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         return BehaviorStatus::Running;
     }
 
-    // In range: avoid resurrecting next to hostiles.
-    const auto hostilesNearGhost = s.hostilesNear(p.position, ctx.config.corpseSafeRadius);
-    if (!safeSpotGivenUp_ && !hostilesNearGhost.empty())
+    // In range: never up next to hostiles. The ghost moves about within
+    // resurrect range to the spot furthest from them, and again when they
+    // come to it, until none is within corpseSafeRadius of it - or, camped
+    // for corpseCampedTimeout, resurrects all the same and runs.
+    const auto threatened = [&](const Vec3& at) { return !s.hostilesNear(at, ctx.config.corpseSafeRadius).empty(); };
+
+    if (!safeSpotGivenUp_ && threatened(p.position))
     {
-        if (!safeSpot_)
+        constexpr Duration kRethink{3000};
+
+        if (!campedSince_)
         {
-            safeSpot_ = findSafeSpot(*corpse, s, ctx);
-            safeSpotStarted_ = now;
-            ctx.log.info(logcat::Death, "hostiles near corpse - moving to safer spot {}", *safeSpot_);
+            campedSince_ = now;
         }
 
-        // Move to the safe spot if not yet there.
-        if (distance2D(p.position, *safeSpot_) > 2.0f)
+        if (now - *campedSince_ >= ctx.config.corpseCampedTimeout)
         {
-            const NavStatus st = ctx.navigator.moveTo(s, *safeSpot_, 2.0f);
-            if (st == NavStatus::Unreachable || now - safeSpotStarted_ >= ctx.config.safeSpotTimeout)
-            {
-                ctx.log.info(logcat::Death, "cannot reach safer spot {} ({}after {:.0f}s) - planning escape route before resurrecting",
-                             *safeSpot_, st == NavStatus::Unreachable ? "unreachable, " : "", toSeconds(now - safeSpotStarted_));
-                safeSpotGivenUp_ = true;
-                const Vec3 escapeSpot = findEscapeSpot(p.position, *corpse, s, ctx);
-                ctx.resurrectEscape = ResurrectEscape{escapeSpot, p.position, now};
-            }
-            else if (st != NavStatus::Arrived)
-            {
-                return BehaviorStatus::Running;
-            }
-        }
-        else
-        {
-            // At safe spot: if hostiles are still near, wait up to safeSpotTimeout (10s) for them to wander off.
-            if (now - safeSpotStarted_ < ctx.config.safeSpotTimeout)
-            {
-                ctx.navigator.halt();
-                return BehaviorStatus::Running;
-            }
-
-            // safeSpotTimeout (10s) passed and hostiles are still near: plan an escape route away from mobs!
             safeSpotGivenUp_ = true;
             const Vec3 escapeSpot = findEscapeSpot(p.position, *corpse, s, ctx);
             ctx.resurrectEscape = ResurrectEscape{escapeSpot, p.position, now};
-            ctx.log.info(logcat::Death, "hostiles still near resurrect spot ({:.0f} yd from corpse) after {:.0f}s - planning escape route to {} before resurrecting", distance2D(p.position, *corpse), toSeconds(now - safeSpotStarted_), escapeSpot);
+            ctx.log.info(logcat::Death, "hostiles still near the corpse after {:.0f}s - resurrecting {:.0f} yd from it and running to {}", toSeconds(now - *campedSince_), distance2D(p.position, *corpse), escapeSpot);
         }
+        else
+        {
+            // A spot taken over by a hostile since it was chosen: another.
+            if (!safeSpot_ || (threatened(*safeSpot_) && now - safeSpotThought_ >= kRethink))
+            {
+                const Vec3 spot = findSafeSpot(*corpse, s, ctx);
+                safeSpotThought_ = now;
+
+                if (!safeSpot_ || distance2D(spot, *safeSpot_) > 3.0f)
+                {
+                    ctx.log.info(logcat::Death, "hostiles near the ghost - moving to {} ({:.0f} yd from the corpse) to resurrect clear of them", spot, distance2D(spot, *corpse));
+                    safeSpot_ = spot;
+                    safeSpotStarted_ = now;
+                }
+            }
+
+            if (distance2D(p.position, *safeSpot_) > 2.0f)
+            {
+                const NavStatus st = ctx.navigator.moveTo(s, *safeSpot_, 2.0f);
+
+                // No way there: that spot is not tried again for a while.
+                if (st == NavStatus::Unreachable || now - safeSpotStarted_ >= ctx.config.safeSpotTimeout)
+                {
+                    ctx.log.info(logcat::Death, "cannot get to {} ({}after {:.0f}s) - trying another spot", *safeSpot_, st == NavStatus::Unreachable ? "unreachable, " : "", toSeconds(now - safeSpotStarted_));
+                    ctx.areaBlacklist.add(*safeSpot_, 3.0f, Duration(60000), "no way there for the ghost");
+                    safeSpot_.reset();
+                }
+            }
+            else
+            {
+                // There, and still not clear: wait for them to wander off.
+                ctx.navigator.halt();
+            }
+
+            return BehaviorStatus::Running;
+        }
+    }
+    else if (!threatened(p.position))
+    {
+        campedSince_.reset();
     }
 
     ctx.navigator.stop();

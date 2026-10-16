@@ -452,8 +452,14 @@ struct BotConfig
     Duration releaseRetry{5000};
     float resurrectRange = 25.0f; // retrieve corpse within this distance (WoW allows ~39)
     float corpseSafeRadius = 20.0f;
-    Duration safeSpotTimeout{10000};
-    Duration resurrectEscapeTimeout{15000};
+    Duration safeSpotTimeout{10000}; // to get to a spot clear of hostiles, before another is tried
+    // How long the ghost waits, moving about within resurrect range, for a
+    // spot with no hostile within corpseSafeRadius before it resurrects
+    // anyway (and runs, ResurrectEscape).
+    Duration corpseCampedTimeout{90000};
+    // The run after resurrecting next to hostiles, a new way taken while the
+    // place reached is not clear of them; then rested wherever it got to.
+    Duration resurrectEscapeTimeout{45000};
     Duration retrieveRetry{3000};
 };
 

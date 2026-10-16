@@ -100,6 +100,7 @@ struct ResurrectEscape
     Vec3 destination;
     Vec3 origin;
     TimePoint startedAt{};
+    int replans = 0; // new destinations chosen on the way, the first one not clear
 };
 
 // Everything a behavior can use. Owned and wired by BotInstance; behaviors
