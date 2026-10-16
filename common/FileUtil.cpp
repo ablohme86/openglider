@@ -31,6 +31,23 @@
 namespace og
 {
 
+namespace
+{
+
+std::string& appName()
+{
+    static std::string name = OG_APP_NAME;
+    return name;
+}
+
+std::filesystem::path& dataDirectory()
+{
+    static std::filesystem::path directory = OG_DATA_DIR;
+    return directory;
+}
+
+} // namespace
+
 std::filesystem::path resolveDataFile(const std::string& path)
 {
     const std::filesystem::path p(path);
@@ -59,7 +76,7 @@ std::filesystem::path resolveDataFile(const std::string& path)
         }
     }
 
-    if (auto data = std::filesystem::path(OG_DATA_DIR) / p; std::filesystem::exists(data))
+    if (auto data = dataDirectory() / p; std::filesystem::exists(data))
     {
         return data;
     }
@@ -103,7 +120,23 @@ bool writeTextFile(const std::filesystem::path& path, const std::string& content
 
 std::string_view applicationName()
 {
-    return OG_APP_NAME;
+    return appName();
+}
+
+void setApplicationName(std::string name)
+{
+    if (!name.empty())
+    {
+        appName() = std::move(name);
+    }
+}
+
+void setDataDirectory(std::filesystem::path directory)
+{
+    if (!directory.empty())
+    {
+        dataDirectory() = std::move(directory);
+    }
 }
 
 std::string applicationDirectoryName()
