@@ -22,6 +22,8 @@
 #include "og/navigation/Roaming.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <limits>
 #include <utility>
 
@@ -32,6 +34,7 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
 {
     std::vector<std::unique_ptr<IBotBehavior>> out;
     out.push_back(std::make_unique<SurfaceBehavior>());
+    out.push_back(std::make_unique<LeaveFireBehavior>());
     out.push_back(std::make_unique<EmergencyBehavior>());
     out.push_back(std::make_unique<PartyHealBehavior>());
     out.push_back(std::make_unique<DeathBehavior>());
@@ -54,6 +57,157 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
     out.push_back(std::make_unique<PullBehavior>());
     out.push_back(std::make_unique<NavigationBehavior>());
     return out;
+}
+
+// --- LeaveFire ------------------------------------------------------------------
+
+namespace
+{
+
+// A campfire burns within a yard of its middle or so (Northshire's, 1.60.1:
+// hurt at 0.9 yd, not at 1.4); a little more, for larger fires. Left for
+// twice that.
+constexpr float kFireReach = 1.6f;
+constexpr float kFireClear = 3.5f;
+
+bool namesFire(std::string_view name)
+{
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+    for (const std::string_view word : {"fire", "brazier", "flame"})
+    {
+        if (lower.find(word) != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace
+
+const GameObjectState* LeaveFireBehavior::fireUnderfoot(const GameSnapshot& s)
+{
+    const GameObjectState* best = nullptr;
+
+    for (const auto& g : s.objects)
+    {
+        // Herbs (Firebloom), ore and chests are no fires.
+        if (g.kind != GameObjectKind::Generic && g.kind != GameObjectKind::Unknown)
+        {
+            continue;
+        }
+
+        const float d = distance2D(g.position, s.player.position);
+
+        if (d <= kFireReach && std::abs(g.position.z - s.player.position.z) < 3.0f && namesFire(g.name) && (!best || d < distance2D(best->position, s.player.position)))
+        {
+            best = &g;
+        }
+    }
+
+    return best;
+}
+
+bool LeaveFireBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
+{
+    // A second in it: one walked through on the way is not stood in.
+    constexpr Duration kStood{1000};
+
+    if (to_)
+    {
+        return !s.player.isDeadOrGhost();
+    }
+
+    if (s.player.isDeadOrGhost() || !fireUnderfoot(s))
+    {
+        inSince_.reset();
+        return false;
+    }
+
+    if (!inSince_)
+    {
+        inSince_ = ctx.now();
+    }
+
+    return ctx.now() - *inSince_ >= kStood;
+}
+
+void LeaveFireBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
+{
+    const GameObjectState* fire = fireUnderfoot(s);
+
+    if (!fire)
+    {
+        return;
+    }
+
+    // Straight out from the middle, the way the character already leans; on
+    // ground the map has, else another way.
+    const Vec3 middle = fire->position;
+    const Vec3 away = s.player.position - middle;
+    const float length = std::hypot(away.x, away.y);
+    const float heading = length > 0.2f ? std::atan2(away.y, away.x) : s.player.heading + kPi;
+
+    for (const float turn : {0.0f, 0.8f, -0.8f, 1.6f, -1.6f, 2.4f, -2.4f, kPi})
+    {
+        Vec3 spot = middle + Vec3{std::cos(heading + turn) * kFireClear, std::sin(heading + turn) * kFireClear, 0};
+        spot.z = s.player.position.z;
+
+        if (ctx.navigator.provider().usesClientGeometry())
+        {
+            const auto walkable = ctx.navigator.provider().findWalkablePoint(spot, 2.0f, 0.5f);
+
+            if (!walkable)
+            {
+                continue;
+            }
+
+            spot = *walkable;
+        }
+
+        to_ = spot;
+        break;
+    }
+
+    fire_ = middle;
+    startedAt_ = ctx.now();
+    ctx.log.info(logcat::Move, "standing in {} - stepping out of it", fire->name);
+}
+
+void LeaveFireBehavior::onExit(BotContext& ctx)
+{
+    inSince_.reset();
+    fire_.reset();
+    to_.reset();
+    ctx.navigator.stop();
+}
+
+BehaviorStatus LeaveFireBehavior::tick(const GameSnapshot& s, BotContext& ctx)
+{
+    const auto done = [&]
+    {
+        inSince_.reset();
+        fire_.reset();
+        to_.reset();
+        ctx.navigator.stop();
+        return BehaviorStatus::Success;
+    };
+
+    if (!to_ || !fire_ || ctx.now() - startedAt_ > Duration(5000))
+    {
+        return done();
+    }
+
+    if (distance2D(s.player.position, *fire_) >= kFireClear - 0.5f)
+    {
+        return done();
+    }
+
+    const NavStatus status = ctx.navigator.moveTo(s, *to_, 0.5f);
+    return status == NavStatus::Arrived || status == NavStatus::Unreachable ? done() : BehaviorStatus::Running;
 }
 
 // --- LeaveRespawn ---------------------------------------------------------------
