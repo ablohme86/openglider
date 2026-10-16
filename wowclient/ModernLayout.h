@@ -261,6 +261,10 @@ inline constexpr std::uint16_t AuraFlagNegative = 0x10;
 
 inline constexpr std::uint32_t ActionFlagItem = 0x80000000;
 inline constexpr std::uint32_t ActionFlagMacro = 0x40000000; // as in 3.3.5a; not seen on 2.5.6 yet
+// An action bar slot's kind is the top byte of its flags: 0 a spell, an item,
+// a macro - and others besides (WoW Forever 1.60.1.70450: 0x30, id 267, on a
+// hunter's bars), which are none of those.
+inline constexpr std::uint32_t ActionFlagTypeMask = 0xFF000000;
 } // namespace modern
 
 } // namespace og::wowclient
