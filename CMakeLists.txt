@@ -19,6 +19,7 @@
 #   replay      snapshot recording and replay provider
 #   sim         simulated world for offline testing
 #   wowclient   WoW client memory state provider (3.3.5a, 1.12.1 layouts)
+#   abi         whether the engine running fits the program's headers
 add_subdirectory(common)
 add_subdirectory(state)
 add_subdirectory(input)
@@ -37,3 +38,5 @@ add_subdirectory(wowclient)
 if(OG_HAVE_STORMLIB OR OG_HAVE_CASCLIB)
     add_subdirectory(minimap)
 endif()
+# Last: it sees every module's types.
+add_subdirectory(abi)

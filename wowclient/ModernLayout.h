@@ -263,8 +263,4 @@ inline constexpr std::uint32_t ActionFlagItem = 0x80000000;
 inline constexpr std::uint32_t ActionFlagMacro = 0x40000000; // as in 3.3.5a; not seen on 2.5.6 yet
 } // namespace modern
 
-const ModernLayout& modernLayout256();
-const ModernLayout& modernLayout1159();
-const ModernLayout& modernLayout1601();
-
 } // namespace og::wowclient

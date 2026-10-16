@@ -203,10 +203,6 @@ struct ClientLayout
 
 const ClientLayout& layout335a();
 const ClientLayout& layout1121();
-// In the binary only with OG_EMBED_MODERN_LAYOUTS; release builds get it from the license server.
-const ClientLayout& layout256();
-const ClientLayout& layout1159();
-const ClientLayout& layout1601();
 
 struct LayoutDocument; // LayoutJson.h
 
@@ -216,6 +212,11 @@ const std::vector<const ClientLayout*>& legacyLayouts();
 // registered at run time, then any compiled in. A copy, because registration
 // can change the list on another thread.
 std::vector<const ClientLayout*> knownLayouts();
+// A layout the application compiled in (64-bit clients are not part of
+// OpenGlider; a development build of an application may carry some). Listed
+// after those registered at run time: one from there wins. It must live for
+// the rest of the program.
+void addCompiledLayout(const ClientLayout& layout);
 // Adds a 64-bit layout from outside (the license server) and returns it; it
 // replaces a compiled-in or earlier one for the same build. Always read-only.
 // nullptr for the build of a legacy client. A registered layout stays in

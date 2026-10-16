@@ -57,6 +57,12 @@ std::deque<DynamicLayout>& registry()
     return entries;
 }
 
+std::vector<const ClientLayout*>& compiled()
+{
+    static std::vector<const ClientLayout*> layouts;
+    return layouts;
+}
+
 } // namespace
 
 const std::vector<const ClientLayout*>& legacyLayouts()
@@ -80,24 +86,28 @@ std::vector<const ClientLayout*> knownLayouts()
             }
         }
     }
-#ifdef OG_EMBED_MODERN_LAYOUTS
-    // Development builds carry modern layouts; one from the server wins.
-    if (!listed(layout256().build))
+    // The application's own; one registered at run time wins.
+    std::scoped_lock lock(registryMutex());
+
+    for (const ClientLayout* layout : compiled())
     {
-        out.push_back(&layout256());
+        if (!listed(layout->build))
+        {
+            out.push_back(layout);
+        }
     }
 
-    if (!listed(layout1159().build))
-    {
-        out.push_back(&layout1159());
-    }
-
-    if (!listed(layout1601().build))
-    {
-        out.push_back(&layout1601());
-    }
-#endif
     return out;
+}
+
+void addCompiledLayout(const ClientLayout& layout)
+{
+    std::scoped_lock lock(registryMutex());
+
+    if (std::find(compiled().begin(), compiled().end(), &layout) == compiled().end())
+    {
+        compiled().push_back(&layout);
+    }
 }
 
 const ClientLayout* registerLayout(const LayoutDocument& document)

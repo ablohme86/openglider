@@ -26,6 +26,6 @@ og_add_module(wowclient
     PRIVATE_DEPS
         ${OG_YAML_TARGET})
 
-# The 64-bit client layouts are not part of OpenGlider: a build that has them
-# adds their sources to og_wowclient and defines OG_EMBED_MODERN_LAYOUTS;
-# otherwise they are registered at run time (registerLayout).
+# The 64-bit client layouts are not part of OpenGlider: an application that
+# has them compiled in adds them with addCompiledLayout; otherwise they are
+# registered at run time (registerLayout).
