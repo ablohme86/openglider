@@ -1,0 +1,424 @@
+# How the actions the combat classes name behave.
+#
+# Combat classes say *what* to do ("Warrior.Rend"). The key it is pressed with
+# comes from your action bars: AllGlider reads them when it attaches, and moves,
+# jumps and targets on the keys your character has for that. This file only
+# says what the action bars cannot tell:
+#
+#   gcd:      true = on the global cooldown (spells and abilities)
+#   cooldown: seconds before the bot may use the action again
+#   castTime: seconds the cast takes at most (the bot stands still for it)
+#   range:    furthest the target may be, in yards; minRange the nearest
+#   friendly: true = can be cast on others (a heal, a shield): a party healer's
+#             emergency rules cast it on the party members too
+#   chat:     a slash command typed for the action instead of pressing a button
+#             ("/petattack")
+#
+# A spell that is not listed still works when it is on an action bar; list it
+# to give it a range, a cast time or a cooldown.
+
+globalCooldown: 1.5
+
+actions:
+  # --- movement and the player ------------------------------------------------
+  Move.Forward: {}
+  Move.Backward: {}
+  Move.TurnLeft: {}
+  Move.TurnRight: {}
+  Move.StrafeLeft: {}
+  Move.StrafeRight: {}
+  Target.Next: {}
+  Target.Clear: {}
+  Move.Jump:
+    cooldown: 0.5
+  Move.SwimUp: {}         # held in the water: the client's Jump key
+  Move.SwimDown: {}       # held in the water: the client's Sit/Move Down key
+  Player.Interact:
+    cooldown: 0.5
+  Player.ReleaseSpirit:
+    cooldown: 3
+  Player.RetrieveCorpse:
+    cooldown: 2
+  Camera.ResetView:
+    cooldown: 1.0
+  Player.HealthPotion:    # a healing potion or healthstone on an action bar
+    cooldown: 120
+  Player.ManaPotion:      # a mana potion on an action bar
+    cooldown: 120
+  Player.Eat:
+    cooldown: 20
+  Player.Drink:
+    cooldown: 20
+
+  # --- pet ----------------------------------------------------------------------
+  # Fallback for clients without UI reading. With UI reading the standard
+  # pet bar's command buttons are clicked instead. An explicit pet spell, e.g.
+  #   Pet.Firebolt: { chat: "/cast Firebolt", cooldown: 1.0 }
+  Pet.Attack:
+    chat: "/petattack"
+    cooldown: 1.0
+  Pet.Follow:
+    chat: "/petfollow"
+    cooldown: 1.0
+  Pet.Stay:
+    chat: "/petstay"
+    cooldown: 1.0
+  Pet.Passive:
+    chat: "/petpassive"
+    cooldown: 1.0
+  Pet.Defensive:
+    chat: "/petdefensive"
+    cooldown: 1.0
+  Pet.Aggressive:
+    chat: "/petaggressive"
+    cooldown: 1.0
+
+  # --- warrior ----------------------------------------------------------------
+  Warrior.AutoAttack:
+    cooldown: 2
+    range: 5
+  Warrior.Rend:
+    gcd: true
+    range: 5
+  Warrior.HeroicStrike:   # off the GCD, queued on the next swing
+    cooldown: 1
+    range: 5
+  Warrior.Charge:
+    cooldown: 15
+    range: 25
+    minRange: 8
+  Warrior.BattleShout:
+    gcd: true
+  Warrior.ThunderClap:    # round the warrior: the mobs in melee
+    gcd: true
+    cooldown: 4
+    range: 5
+  Warrior.Hamstring:
+    gcd: true
+    range: 5
+
+  # --- paladin ----------------------------------------------------------------
+  Paladin.AutoAttack:
+    cooldown: 2
+    range: 5
+  Paladin.SealOfRighteousness:
+    gcd: true
+  Paladin.HolyLight:
+    gcd: true
+    castTime: 2.5
+    friendly: true
+  Paladin.Judgement:
+    gcd: true
+    cooldown: 8
+    range: 10
+  Paladin.BlessingOfMight:
+    gcd: true
+  Paladin.DevotionAura:
+    gcd: true
+  Paladin.CrusaderStrike:
+    gcd: true
+    cooldown: 4
+    range: 5
+  Paladin.HammerOfJustice:
+    gcd: true
+    cooldown: 60
+    range: 10
+  Paladin.DivineShield:
+    gcd: true
+    cooldown: 300
+  Paladin.LayOnHands:
+    cooldown: 1200
+    friendly: true
+
+  # --- hunter -----------------------------------------------------------------
+  Hunter.AutoAttack:      # melee when the target is too close to shoot
+    cooldown: 2
+    range: 5
+  Hunter.AutoShot:
+    castTime: 0.5
+    cooldown: 2
+    range: 35
+    minRange: 8
+  Hunter.ArcaneShot:
+    gcd: true
+    cooldown: 6
+    range: 35
+    minRange: 8
+  Hunter.SerpentSting:
+    gcd: true
+    range: 35
+    minRange: 8
+  Hunter.HuntersMark:
+    gcd: true
+    range: 100
+  Hunter.ConcussiveShot:
+    gcd: true
+    cooldown: 12
+    range: 35
+    minRange: 8
+  Hunter.RaptorStrike:
+    cooldown: 6
+    range: 5
+  Hunter.WingClip:
+    gcd: true
+    cooldown: 5
+    range: 5
+  Hunter.AspectOfTheHawk:
+    gcd: true
+
+  # --- mage -------------------------------------------------------------------
+  Mage.AutoAttack:        # melee when out of mana with no wand
+    cooldown: 2
+    range: 5
+  Mage.Fireball:
+    gcd: true
+    castTime: 1.5
+    range: 35
+  Mage.Frostbolt:
+    gcd: true
+    castTime: 3.0
+    range: 30
+  Mage.FireBlast:
+    gcd: true
+    cooldown: 8
+    range: 20
+  Mage.FrostNova:
+    gcd: true
+    cooldown: 25
+    range: 10
+  Mage.ConeOfCold:
+    gcd: true
+    cooldown: 10
+    range: 10
+  Mage.IceArmor:
+    gcd: true
+  Mage.FrostArmor:
+    gcd: true
+  Mage.ArcaneIntellect:
+    gcd: true
+  Mage.IceBarrier:
+    gcd: true
+    cooldown: 30
+  Mage.Shoot:
+    cooldown: 2
+    range: 30
+    minRange: 8
+  Mage.ConjureWater:
+    gcd: true
+    castTime: 3.0
+    cooldown: 3.5
+  Mage.ConjureFood:
+    gcd: true
+    castTime: 3.0
+    cooldown: 3.5
+
+  # --- rogue ------------------------------------------------------------------
+  Rogue.AutoAttack:
+    cooldown: 2
+  Rogue.SinisterStrike:
+    gcd: true
+  Rogue.Eviscerate:
+    gcd: true
+  Rogue.SliceAndDice:
+    gcd: true
+  Rogue.Evasion:
+    cooldown: 180
+  Rogue.Kick:             # interrupts a cast; off the GCD
+    cooldown: 10
+    range: 5
+  Rogue.Backstab:         # from behind
+    gcd: true
+    range: 5
+  Rogue.Gouge:
+    gcd: true
+    cooldown: 10
+    range: 5
+  Rogue.Riposte:          # after a parry
+    gcd: true
+    cooldown: 6
+    range: 5
+  Rogue.Rupture:
+    gcd: true
+    range: 5
+  Rogue.ExposeArmor:
+    gcd: true
+    range: 5
+  Rogue.KidneyShot:
+    gcd: true
+    cooldown: 20
+    range: 5
+  Rogue.Feint:
+    gcd: true
+    cooldown: 10
+  Rogue.Sprint:
+    gcd: true
+    cooldown: 300
+  Rogue.Blind:
+    gcd: true
+    cooldown: 300
+    range: 10
+  Rogue.Vanish:
+    gcd: true
+    cooldown: 300
+  Rogue.Stealth:
+    cooldown: 10
+  Rogue.CheapShot:        # from Stealth
+    gcd: true
+    range: 5
+  Rogue.Garrote:          # from Stealth, from behind
+    gcd: true
+    range: 5
+  Rogue.Ambush:           # from Stealth, from behind
+    gcd: true
+    range: 5
+
+  # --- priest -----------------------------------------------------------------
+  Priest.AutoAttack:      # melee when out of mana with no wand
+    cooldown: 2
+    range: 5
+  Priest.Smite:
+    gcd: true
+    castTime: 2.5
+    range: 30
+  Priest.ShadowWordPain:
+    gcd: true
+    range: 30
+  Priest.DevouringPlague:
+    gcd: true
+    range: 30
+  Priest.PowerWordShield:
+    gcd: true
+    cooldown: 15
+    friendly: true
+  Priest.FlashHeal:
+    gcd: true
+    castTime: 1.5
+    friendly: true
+  Priest.LesserHeal:     # 1.5 s at rank 1, 2.5 s from rank 3
+    gcd: true
+    castTime: 2.5
+    friendly: true
+  Priest.PowerWordFortitude:
+    gcd: true
+  Priest.InnerFire:
+    gcd: true
+  Priest.MindBlast:
+    gcd: true
+    castTime: 1.5
+    cooldown: 8
+    range: 30
+  Priest.Shoot:
+    cooldown: 2
+    range: 30
+
+  # --- warlock ----------------------------------------------------------------
+  Warlock.AutoAttack:     # melee when out of mana with no wand
+    cooldown: 2
+    range: 5
+  Warlock.ShadowBolt:
+    gcd: true
+    castTime: 3.0
+    range: 30
+  Warlock.Corruption:     # 2 s until Improved Corruption brings it down to instant
+    gcd: true
+    castTime: 2.0
+    range: 30
+  Warlock.CurseOfAgony:
+    gcd: true
+    range: 30
+  Warlock.Immolate:
+    gcd: true
+    castTime: 2.0
+    range: 30
+  Warlock.LifeTap:
+    gcd: true
+  Warlock.DemonSkin:
+    gcd: true
+  Warlock.SummonImp:      # stood still for: walking breaks the summoning off
+    gcd: true
+    castTime: 10.0
+  Warlock.SummonVoidwalker:
+    gcd: true
+    castTime: 10.0
+  Warlock.SummonSuccubus:
+    gcd: true
+    castTime: 10.0
+  Warlock.SummonFelhunter:
+    gcd: true
+    castTime: 10.0
+  Warlock.CreateHealthstone:
+    gcd: true
+    castTime: 3.0
+  Warlock.CreateSoulstone:
+    gcd: true
+    castTime: 3.0
+  Warlock.DemonArmor:
+    gcd: true
+  Warlock.DrainLife:
+    gcd: true
+    range: 20
+  Warlock.Shoot:
+    cooldown: 2
+    range: 30
+
+  # --- druid ------------------------------------------------------------------
+  Druid.Wrath:
+    gcd: true
+    castTime: 1.5
+    range: 30
+  Druid.Moonfire:
+    gcd: true
+    range: 30
+  Druid.Rejuvenation:
+    gcd: true
+    friendly: true
+  Druid.HealingTouch:
+    gcd: true
+    castTime: 3.5
+    friendly: true
+  Druid.MarkOfTheWild:
+    gcd: true
+  Druid.Thorns:
+    gcd: true
+  Druid.AutoAttack:
+    cooldown: 2
+
+  # --- shaman -----------------------------------------------------------------
+  Shaman.AutoAttack:
+    cooldown: 2
+  Shaman.LightningBolt:
+    gcd: true
+    castTime: 3.0
+  Shaman.EarthShock:
+    gcd: true
+    cooldown: 6
+  Shaman.FlameShock:
+    gcd: true
+    cooldown: 6
+  Shaman.HealingWave:
+    gcd: true
+    castTime: 3.0
+    friendly: true
+  Shaman.LightningShield:
+    gcd: true
+
+  # --- death knight -----------------------------------------------------------
+  DeathKnight.AutoAttack:
+    cooldown: 2
+  DeathKnight.IcyTouch:
+    gcd: true
+  DeathKnight.PlagueStrike:
+    gcd: true
+  DeathKnight.DeathStrike:
+    gcd: true
+  DeathKnight.BloodStrike:
+    gcd: true
+  DeathKnight.DeathCoil:
+    gcd: true
+  DeathKnight.DeathGrip:
+    cooldown: 35
+  DeathKnight.HornOfWinter:
+    gcd: true
+    cooldown: 20
+  DeathKnight.IceboundFortitude:
+    cooldown: 120

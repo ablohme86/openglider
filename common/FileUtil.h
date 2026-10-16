@@ -29,11 +29,16 @@ namespace og
 std::optional<std::string> readTextFile(const std::filesystem::path& path);
 bool writeTextFile(const std::filesystem::path& path, const std::string& content);
 
-// The application OpenGlider is built into (OG_APP_NAME, "OpenGlider" unless
-// the parent project sets it), as shown to the user, and in lower case as the
-// name of its directories.
+// The application OpenGlider runs in, as shown to the user, and in lower case
+// as the name of its directories: what the application said
+// (setApplicationName), else OG_APP_NAME as built ("OpenGlider" unless the
+// parent project sets it). A shared engine built on its own cannot know it.
 std::string_view applicationName();
 std::string applicationDirectoryName();
+// Before anything reads a file: the application's name, and its development
+// data directory (looked in last, resolveDataFile).
+void setApplicationName(std::string name);
+void setDataDirectory(std::filesystem::path directory);
 
 // ~/.config/<app> on Linux, %APPDATA%/<App> on Windows.
 std::filesystem::path defaultConfigDirectory();

@@ -28,6 +28,31 @@ modules it lists as dependencies:
 | `minimap`    | the client's minimap tiles (with StormLib or CascLib)          |
 
 
+## Building
+
+OpenGlider builds on its own into one shared library: `libopenglider.so` on
+Linux, `OpenGlider.dll` on Windows. CMake 3.24 and a C++20 compiler are needed;
+missing dependencies (SQLite, yaml-cpp, StormLib, CascLib, Recast/Detour) are
+fetched.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+# build/lib/libopenglider.so
+```
+
+A program built against these headers can run with a library you built from
+modified sources in place of its own. At start it checks that the library was
+built from the same headers (`og/abi/EngineAbi.h`): one that was not is
+refused, since the program would crash with it, and one that fits but is not
+the program's own is reported as a custom engine. Changes to `.cpp` files fit;
+a change to a header that alters a type the program shares (a field added to
+`GameSnapshot`, say) does not.
+
+The application's name (which names its config directories) and its data
+directory are told to the engine by the program (`setApplicationName`,
+`setDataDirectory`); a library built on its own does not know them.
+
 ## License
 
 Copyright (c) 2026 Alexander Blohmè.
