@@ -358,8 +358,10 @@ private:
     std::vector<Vec3> ghostPath_;
     std::size_t ghostIndex_ = 0;
     std::optional<Vec3> safeSpot_;
-    TimePoint safeSpotStarted_{};
+    TimePoint safeSpotStarted_{}; // set out for safeSpot_ at
+    TimePoint safeSpotThought_{}; // last looked for a better one at
     bool safeSpotGivenUp_ = false;
+    std::optional<TimePoint> campedSince_; // in range with a hostile near the ghost since
     bool warnedNoCorpse_ = false;
     std::optional<TimePoint> ghostSince_;
     std::optional<Vec3> lastGhostPosition_;
