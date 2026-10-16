@@ -42,12 +42,10 @@ cmake --build build --parallel
 ```
 
 A program built against these headers can run with a library you built from
-modified sources in place of its own. At start it checks that the library was
-built from the same headers (`og/abi/EngineAbi.h`): one that was not is
-refused, since the program would crash with it, and one that fits but is not
-the program's own is reported as a custom engine. Changes to `.cpp` files fit;
-a change to a header that alters a type the program shares (a field added to
-`GameSnapshot`, say) does not.
+modified sources. At start it can check that the library was built from the
+same headers (`og/abi/EngineAbi.h`): one that was not would crash it. Changes
+to `.cpp` files fit; a change to a header that alters a type the program
+shares (a field added to `GameSnapshot`, say) does not.
 
 The application's name (which names its config directories) and its data
 directory are told to the engine by the program (`setApplicationName`,
@@ -55,7 +53,8 @@ directory are told to the engine by the program (`setApplicationName`,
 
 [docs/CustomEngine.md](docs/CustomEngine.md) is the full guide: running a
 program with your build, which changes work and which do not, where things
-are, recipes, and how the check works.
+are, recipes, and how the check works. AllGlider has the engine compiled in
+and does not run with another.
 
 ## License
 

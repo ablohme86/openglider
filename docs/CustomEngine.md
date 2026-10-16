@@ -1,12 +1,15 @@
-# Building your own engine
+# Building OpenGlider as a library
 
 OpenGlider builds into one shared library: `libopenglider.so` on Linux,
-`OpenGlider.dll` on Windows. A program built against OpenGlider's headers,
-AllGlider among them, runs with that library. You can change OpenGlider, build
-the library yourself and run the program with your build in place of the one
-it shipped with.
+`OpenGlider.dll` on Windows. Your own programs can build against its headers
+and run with it, and you can change OpenGlider and build it again for them.
 
-This guide covers how to do that, which changes work, which do not, and why.
+This guide covers how to build it, how a program runs with a build, which
+changes a program built against the headers survives, and why.
+
+> **AllGlider** has the engine compiled into it and runs with no other: it
+> refuses an OpenGlider library that is not its own build. This guide is for
+> programs of your own.
 
 - [Quick start](#quick-start)
 - [Running a program with your build](#running-a-program-with-your-build)
@@ -20,8 +23,9 @@ This guide covers how to do that, which changes work, which do not, and why.
 
 ## Quick start
 
-Start from the OpenGlider sources the program you use was built from. A newer
-or older checkout may not fit it; see [Which changes work](#which-changes-work).
+A program built against these headers runs with a library built from the same
+OpenGlider version. A newer or older checkout may not fit it; see
+[Which changes work](#which-changes-work).
 
 ### Linux
 
@@ -55,41 +59,46 @@ cmake --build build --config Release --parallel
 
 The library is `build\lib\Release\OpenGlider.dll`.
 
-Build with the same compiler family the program was built with: MSVC 2022 for
-the Windows release, and GCC or Clang with libstdc++ on Linux. C++ libraries
-built by different compilers on Windows (MSVC and MinGW, say) cannot be mixed.
+Build the library and the program with the same compiler family: on Windows,
+C++ libraries built by different compilers (MSVC and MinGW, say) cannot be
+mixed. On Linux, GCC and Clang with libstdc++ mix.
 
 ## Running a program with your build
 
-### AllGlider
+Link your program against the library with CMake: add OpenGlider with
+`add_subdirectory()` and `OG_SHARED_ENGINE=ON` (see
+[The build on its own](#the-build-on-its-own)), and link `openglider`. The
+program finds the library by its RUNPATH, by the system's library path, or,
+on Windows, beside the `.exe`.
 
-| | Where the engine is | What to do |
-|---|---|---|
-| Linux | `libopenglider.so`, beside `allglider-gui` | Replace that file with yours |
-| Windows | `bin\OpenGlider.dll` | Replace that file with yours |
-
-Keep a copy of the original so you can go back to it. An AllGlider update
-replaces the whole installation, your library included.
-
-On Linux you can also leave the installation alone and point the program at
-your build for one run:
+To try another build without relinking, put it where the program looks first.
+On Linux:
 
 ```sh
-LD_LIBRARY_PATH=/path/to/openglider/build/lib ./allglider-gui
+LD_LIBRARY_PATH=/path/to/openglider/build/lib ./my-program
 ```
 
-At start, AllGlider checks the library:
+A program should check at start that the library fits it, with `checkEngine()`
+from `abi/EngineAbi.h`:
 
-- **It fits and is AllGlider's own:** nothing is said.
-- **It fits but is not AllGlider's own (yours):** AllGlider runs and says so
-  in its log:
-  `running a custom OpenGlider engine: /path/to/libopenglider.so`
-- **It does not fit** (built from other headers): AllGlider refuses to start
-  and names the file. Running with it would crash or misbehave.
+```cpp
+#include "og/abi/EngineAbi.h"
 
-AllGlider decides itself what it hands to an engine that is not its own. The
-64-bit client layouts, which come from AllGlider's license server, are not
-part of OpenGlider (see [Client layouts](#client-layouts)).
+int main()
+{
+    if (const auto engine = og::checkEngine(""); !engine.compatible)
+    {
+        std::fprintf(stderr, "%s\n", engine.message.c_str());
+        return 1; // it would crash or misbehave
+    }
+    // ...
+}
+```
+
+`checkEngine()` also says whether the library is the build the program came
+with (`custom`), when the program passes the build id it was built with
+(`OG_ENGINE_BUILD_ID`). What to do with another build is the program's choice:
+run with it, say so, or refuse it.
 
 ## Which changes work
 
@@ -297,9 +306,10 @@ list. That is why the rules above matter.
 ### Custom builds
 
 A program built together with an engine gives both the same build id
-(`OG_ENGINE_BUILD_ID`). A library you build has none. The program compares the
-two and reports a library that fits but is not its own as a custom engine.
-The build id says which build a library is. It does not authenticate it.
+(`OG_ENGINE_BUILD_ID`). A library built on its own has none. `checkEngine()`
+compares the two and calls a library that fits but is not the program's own
+`custom`. The build id says which build a library is; it does not
+authenticate it.
 
 ### Names and data the program supplies
 
@@ -343,7 +353,7 @@ shared library with `OG_SHARED_ENGINE=ON`.
 | `the OpenGlider engine in ... was built from other OpenGlider headers than this program` | A shared type's size differs. Build from the program's OpenGlider version, without header changes to shared types |
 | `undefined symbol: _ZN2og...` (Linux) or "entry point not found" (Windows) | Your library lacks a function the program calls: removed, renamed or with other parameters. `c++filt` turns the name into the function |
 | The program crashes soon after start, with no message | Most likely a change the check does not see: a virtual function, swapped fields. Undo header changes one at a time |
-| Your change does nothing | It went into a header default or an inline function the program has its own copy of; or the program loaded another library. On Linux, `ldd ./allglider-gui \| grep openglider` shows which |
+| Your change does nothing | It went into a header default or an inline function the program has its own copy of; or the program loaded another library. On Linux, `ldd ./my-program \| grep openglider` shows which |
 | `cannot link .../include/og to the sources` (Windows) | Turn on Developer Mode |
 
 For a debugger, build your library with `-DCMAKE_BUILD_TYPE=RelWithDebInfo` and
