@@ -389,6 +389,9 @@ struct BotConfig
     // right-click on it. `autoEquipSkipBoE`: never a Bind on Equip piece.
     bool autoEquip = false;
     bool autoEquipSkipBoE = true;
+    // Sit down at campfires (General Settings, WoW Forever): to a campfire in
+    // sight, sat by it until its Welcoming Campfire minute gives Camp Benefits.
+    bool sitAtCampfires = false;
 
     // Looting
     bool loot = true;               // General Settings; off for a fishing session without a profile

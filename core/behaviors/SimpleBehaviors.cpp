@@ -44,6 +44,7 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
     out.push_back(std::make_unique<LootBehavior>());
     out.push_back(std::make_unique<LeaveRespawnBehavior>());
     out.push_back(std::make_unique<GatherBehavior>());
+    out.push_back(std::make_unique<CampfireBehavior>());
     out.push_back(std::make_unique<VendorBehavior>());
     out.push_back(std::make_unique<InventoryQuestBehavior>());
     out.push_back(std::make_unique<QuestHandInBehavior>());
@@ -208,6 +209,210 @@ BehaviorStatus LeaveFireBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 
     const NavStatus status = ctx.navigator.moveTo(s, *to_, 0.5f);
     return status == NavStatus::Arrived || status == NavStatus::Unreachable ? done() : BehaviorStatus::Running;
+}
+
+// --- Campfire -------------------------------------------------------------------
+
+namespace
+{
+
+// WoW Forever's campfire auras (1.60.1): "Campfire Nearby" by one, the minute
+// sat by it counted down by "Welcoming Campfire", then "Camp Benefits" (and a
+// stat, "Extra Strength") for an hour. Welcoming Campfire starts over after
+// its minute while the character stays sat.
+constexpr std::string_view kWelcoming = "Welcoming Campfire";
+constexpr std::string_view kBenefits = "Camp Benefits";
+// As near as the fire does not burn (LeaveFire's reach), and no nearer.
+constexpr float kCampfireSit = kFireReach + 0.4f;
+constexpr float kCampfireSearch = 150.0f;
+
+bool namesCampfire(std::string_view name)
+{
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return lower.find("campfire") != std::string::npos;
+}
+
+} // namespace
+
+const GameObjectState* CampfireBehavior::campfireInSight(const GameSnapshot& s, const BotContext& ctx)
+{
+    const GameObjectState* best = nullptr;
+
+    for (const auto& g : s.objects)
+    {
+        if ((g.kind != GameObjectKind::Generic && g.kind != GameObjectKind::Unknown) || !namesCampfire(g.name) || ctx.objectBlacklist.contains(g.guid))
+        {
+            continue;
+        }
+
+        const float d = distance2D(g.position, s.player.position);
+
+        if (d <= kCampfireSearch && std::abs(g.position.z - s.player.position.z) < 30.0f && (!best || d < distance2D(best->position, s.player.position)))
+        {
+            best = &g;
+        }
+    }
+
+    return best;
+}
+
+bool CampfireBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
+{
+    if (!ctx.config.sitAtCampfires || s.player.isDeadOrGhost() || s.inCombat() || !s.attackers().empty() || ctx.partyFollower())
+    {
+        return false;
+    }
+
+    if (fire_ != 0)
+    {
+        return true;
+    }
+
+    return !s.player.hasAura(kBenefits) && campfireInSight(s, ctx) != nullptr;
+}
+
+void CampfireBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
+{
+    const GameObjectState* fire = fire_ != 0 ? s.findObject(fire_) : campfireInSight(s, ctx);
+
+    if (!fire)
+    {
+        return;
+    }
+
+    if (fire_ == 0)
+    {
+        ctx.log.info(logcat::Rest, "{} {:.0f} yd off - sitting down by it for Camp Benefits", fire->name, distance2D(fire->position, s.player.position));
+    }
+
+    fire_ = fire->guid;
+    phase_ = Phase::Walk;
+    startedAt_ = ctx.now();
+    sitSince_.reset();
+    lastSit_.reset();
+    lastWelcome_ = -1.0f;
+}
+
+void CampfireBehavior::onExit(BotContext& ctx)
+{
+    // Called away (a fight): looked at afresh after it. The fire is kept:
+    // the minute goes on where the character sits.
+    ctx.navigator.stop();
+}
+
+BehaviorStatus CampfireBehavior::done(BotContext& ctx, std::string_view why, bool leaveAlone)
+{
+    if (leaveAlone && fire_ != 0)
+    {
+        ctx.objectBlacklist.add(fire_, Duration(30 * 60 * 1000), std::string(why));
+    }
+
+    ctx.log.info(logcat::Rest, "campfire: {}", why);
+    fire_ = 0;
+    phase_ = Phase::Walk;
+    sitSince_.reset();
+    lastSit_.reset();
+    lastWelcome_ = -1.0f;
+    ctx.navigator.stop();
+    return BehaviorStatus::Success;
+}
+
+BehaviorStatus CampfireBehavior::tick(const GameSnapshot& s, BotContext& ctx)
+{
+    const GameObjectState* fire = fire_ != 0 ? s.findObject(fire_) : nullptr;
+
+    if (!fire)
+    {
+        return done(ctx, "the campfire is gone");
+    }
+
+    if (s.player.hasAura(kBenefits))
+    {
+        return done(ctx, "Camp Benefits");
+    }
+
+    // Walking up, sitting, and the minute, with time to spare.
+    if (ctx.now() - startedAt_ > Duration(120000))
+    {
+        return done(ctx, "no Camp Benefits in two minutes", true);
+    }
+
+    const float d = distance2D(s.player.position, fire->position);
+
+    if (phase_ == Phase::Walk)
+    {
+        if (d > kCampfireSit + 1.0f)
+        {
+            // To the side of it the character comes from.
+            Vec3 toward = s.player.position - fire->position;
+            toward.z = 0;
+            const float length = std::max(0.01f, std::hypot(toward.x, toward.y));
+            const Vec3 spot = fire->position + Vec3{toward.x / length * kCampfireSit, toward.y / length * kCampfireSit, s.player.position.z - fire->position.z};
+            const NavStatus status = ctx.navigator.moveTo(s, spot, 0.5f);
+
+            if (status == NavStatus::Unreachable)
+            {
+                return done(ctx, "no way to the campfire", true);
+            }
+
+            if (status != NavStatus::Arrived)
+            {
+                return BehaviorStatus::Running;
+            }
+        }
+
+        ctx.navigator.stop();
+        ctx.movement.stop();
+        phase_ = Phase::Sit;
+    }
+
+    const Aura* welcome = s.player.findAura(kWelcoming);
+
+    // Again while no Welcoming Campfire says it sits; once it does, only
+    // seldom: a client without the stand state never shows it sat.
+    const Duration again = phase_ == Phase::Wait ? Duration(15000) : Duration(3000);
+
+    if (!s.player.isSitting && !s.player.isMoving && (!lastSit_ || ctx.now() - *lastSit_ >= again))
+    {
+        ctx.actions.chat("/sit");
+        lastSit_ = ctx.now();
+
+        if (!sitSince_)
+        {
+            sitSince_ = ctx.now();
+        }
+    }
+
+    if (phase_ == Phase::Sit)
+    {
+        if (welcome)
+        {
+            phase_ = Phase::Wait;
+            ctx.log.info(logcat::Rest, "campfire: {} - a minute sat by it", kWelcoming);
+        }
+        else if (sitSince_ && ctx.now() - *sitSince_ > Duration(8000))
+        {
+            return done(ctx, std::format("no {} by {}", kWelcoming, fire->name), true);
+        }
+
+        lastWelcome_ = welcome ? welcome->remaining : -1.0f;
+        return BehaviorStatus::Running;
+    }
+
+    // The minute run out and started over: as good as Camp Benefits seen.
+    if (welcome && lastWelcome_ >= 0 && welcome->remaining > lastWelcome_ + 5.0f)
+    {
+        return done(ctx, std::format("{} ran its minute", kWelcoming));
+    }
+
+    if (!welcome && d > kCampfireSit + 3.0f)
+    {
+        phase_ = Phase::Walk;
+    }
+
+    lastWelcome_ = welcome ? welcome->remaining : lastWelcome_;
+    return BehaviorStatus::Running;
 }
 
 // --- LeaveRespawn ---------------------------------------------------------------

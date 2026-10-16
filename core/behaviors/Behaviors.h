@@ -90,6 +90,51 @@ private:
     TimePoint startedAt_{};
 };
 
+// 610, Sit down at campfires (WoW Forever): sat by a campfire for a minute -
+// Welcoming Campfire counts it down - the character gets Camp Benefits and a
+// stat for an hour. Without Camp Benefits and a campfire in sight, the bot
+// walks up to it, as near as it does not burn, types /sit, and waits for the
+// minute to run out (or Welcoming Campfire to start over). A campfire that
+// gives no Welcoming Campfire is left alone for half an hour.
+class CampfireBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "Campfire";
+    }
+
+    int priority() const override
+    {
+        return priority::Campfire;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+    // The nearest campfire in sight not left alone.
+    static const GameObjectState* campfireInSight(const GameSnapshot& s, const BotContext& ctx);
+
+private:
+    enum class Phase
+    {
+        Walk,
+        Sit,
+        Wait
+    };
+
+    BehaviorStatus done(BotContext& ctx, std::string_view why, bool leaveAlone = false);
+
+    Guid fire_ = 0;
+    Phase phase_ = Phase::Walk;
+    TimePoint startedAt_{};
+    std::optional<TimePoint> sitSince_;  // first /sit typed
+    std::optional<TimePoint> lastSit_;   // last /sit typed
+    float lastWelcome_ = -1.0f;          // Welcoming Campfire's seconds left a tick ago
+};
+
 class EmergencyBehavior final : public IBotBehavior
 {
 public:
