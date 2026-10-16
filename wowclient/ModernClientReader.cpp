@@ -1218,6 +1218,60 @@ std::optional<std::string> ModernClientReader::uiText(std::string_view frame, st
     return std::nullopt;
 }
 
+std::optional<std::string> ModernClientReader::minimapZoneText() const
+{
+    if (!L_.uiTop || !L_.uiFontStringText)
+    {
+        return std::nullopt;
+    }
+
+    constexpr std::string_view kName = "MinimapZoneText";
+    const auto textOf = [this](std::uint64_t region) -> std::optional<std::string>
+    {
+        const auto at = memory_.read<std::uint64_t>(region + L_.uiFontStringText);
+        return at && isPointer(*at) ? std::optional(memory_.readString(*at, 128)) : std::nullopt;
+    };
+
+    if (minimapZoneRegion_ && uiObjectNamed(minimapZoneRegion_, kName))
+    {
+        return textOf(minimapZoneRegion_);
+    }
+
+    minimapZoneRegion_ = 0;
+    const auto top = memory_.read<std::uint64_t>(imageBase_ + L_.uiTop);
+
+    if (!top || !*top)
+    {
+        return std::nullopt;
+    }
+
+    const std::uint64_t head = *top + L_.uiTopObjects;
+    auto node = memory_.read<std::uint64_t>(head);
+
+    for (int i = 0; i < 200000 && node && *node && *node != head; ++i)
+    {
+        const std::uint64_t object = *node - L_.uiObjectLink;
+        node = memory_.read<std::uint64_t>(*node);
+        const std::uint64_t regions = object + L_.uiFrameRegions;
+        auto r = memory_.read<std::uint64_t>(regions);
+        std::unordered_set<std::uint64_t> seen;
+
+        for (int j = 0; j < 512 && r && *r && *r != regions && seen.insert(*r).second; ++j)
+        {
+            const std::uint64_t region = *r - L_.uiRegionLink;
+            r = memory_.read<std::uint64_t>(*r);
+
+            if (uiObjectNamed(region, kName))
+            {
+                minimapZoneRegion_ = region;
+                return textOf(region);
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
 std::optional<UiFrame> ModernClientReader::uiFrame(std::string_view name) const
 {
     if ((!L_.uiTop && !L_.uiActionButtonTable) || !L_.uiObjectRect)

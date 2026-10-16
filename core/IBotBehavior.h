@@ -76,6 +76,8 @@ namespace priority
 {
 // Up for air before the breath runs out, whatever else is going on.
 inline constexpr int Surface = 1050;
+// Out of a campfire the bot has come to stand in, resting or fighting.
+inline constexpr int LeaveFire = 1040;
 inline constexpr int Emergency = 1000;
 // Party system: a healer heals a party member before it fights on.
 inline constexpr int PartyHeal = 950;

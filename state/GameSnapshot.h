@@ -34,6 +34,9 @@ struct GameSnapshot
     TimePoint timestamp{};
     std::optional<std::uint32_t> mapId;
     std::uint32_t zoneId = 0;
+    // What the minimap names the place: the subzone ("Northshire Valley"),
+    // or the zone where there is none. Empty where the client's UI is not read.
+    std::string zoneText;
 
     PlayerState player;
     std::vector<UnitState> units;         // every visible unit except the player

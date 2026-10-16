@@ -59,6 +59,37 @@ private:
     std::optional<TimePoint> retryAt_; // let go of the key until then
 };
 
+// 1040: a step out of a campfire (or a bonfire, a brazier) the character has
+// stood in for a second: it burns for a dozen health every few seconds, and
+// neither resting nor a fight would ever leave it. Walking through is let be.
+class LeaveFireBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "LeaveFire";
+    }
+
+    int priority() const override
+    {
+        return priority::LeaveFire;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+    // The fire the character stands in, if it stands in one.
+    static const GameObjectState* fireUnderfoot(const GameSnapshot& s);
+
+private:
+    std::optional<TimePoint> inSince_; // in the fire since
+    std::optional<Vec3> fire_;         // the one being left
+    std::optional<Vec3> to_;
+    TimePoint startedAt_{};
+};
+
 class EmergencyBehavior final : public IBotBehavior
 {
 public:

@@ -16,7 +16,7 @@ modules it lists as dependencies:
 | `actions`    | semantic actions mapped to input                               |
 | `navigation` | routes, the movement controller, stuck handling, client maps   |
 | `targets`    | target filtering and scoring                                   |
-| `profiles`   | Glider profiles: loader, validator, recorder                   |
+| `profiles`   | area, No Go zones, obstacles; load, save, validate, edit       |
 | `combat`     | the combat class interface and the OGScript language           |
 | `core`       | `BotEngine`, behaviors, the objective stack, `BotInstance`     |
 | `tasks`      | task plans and the plan executor                               |
