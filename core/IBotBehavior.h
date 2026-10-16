@@ -89,6 +89,8 @@ inline constexpr int Loot = 700;
 // Out of where a mob comes back at once, once its loot is taken (FastRespawn).
 inline constexpr int LeaveRespawn = 690;
 inline constexpr int Gather = 650;
+// Sit down at campfires (WoW Forever): a minute by one for Camp Benefits.
+inline constexpr int Campfire = 610;
 inline constexpr int Rest = 600;
 // Party system: a follower walks after its leader; the leader waits for a
 // member behind. Above everything that walks somewhere on the bot's own.
