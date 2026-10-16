@@ -180,9 +180,11 @@ void DeathBehavior::buildGhostPath(const Vec3& from, const Vec3& corpse, BotCont
 Vec3 DeathBehavior::findSafeSpot(const Vec3& corpse, const GameSnapshot& s, BotContext& ctx) const
 {
     // The whole of resurrect range, ring by ring: the corpse, then 16 ways
-    // out at a third, three fifths, four fifths and nearly all of it.
+    // out at a third, three fifths, four fifths and nearly all of it - all of
+    // it but the 2 yd the ghost may stop short of a spot by.
     constexpr int kWays = 16;
-    const float reach = std::max(2.0f, ctx.config.resurrectRange - 1.0f);
+    constexpr float kArrival = 2.0f;
+    const float reach = std::max(kArrival, ctx.config.resurrectRange - kArrival);
     Vec3 best = corpse;
     float bestScore = -1.0f;
 
@@ -209,6 +211,12 @@ Vec3 DeathBehavior::findSafeSpot(const Vec3& corpse, const GameSnapshot& s, BotC
                 candidate = *walkable;
             }
             else
+            {
+                continue;
+            }
+
+            // The ground found may lie further out, past resurrect range.
+            if (distance2D(candidate, corpse) > reach + 0.1f)
             {
                 continue;
             }
