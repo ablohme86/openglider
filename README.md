@@ -53,6 +53,10 @@ The application's name (which names its config directories) and its data
 directory are told to the engine by the program (`setApplicationName`,
 `setDataDirectory`); a library built on its own does not know them.
 
+[docs/CustomEngine.md](docs/CustomEngine.md) is the full guide: running a
+program with your build, which changes work and which do not, where things
+are, recipes, and how the check works.
+
 ## License
 
 Copyright (c) 2026 Alexander Blohmè.
