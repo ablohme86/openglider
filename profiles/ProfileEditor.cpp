@@ -8,20 +8,20 @@
  * ============================================================== *
  *
  *  Date: 2026-09-11
- *  File: ProfileRecorder.cpp
+ *  File: ProfileEditor.cpp
  *
  *  Desc:
- *  Implementation of ProfileRecorder (glider profile parsing,
- *  validation, and recording).
+ *  Implementation of ProfileEditor (the profile being drawn: its
+ *  grind, ghost and vendor waypoints).
  *
  *
  */
-#include "og/profiles/ProfileRecorder.h"
+#include "og/profiles/ProfileEditor.h"
 
 namespace og
 {
 
-std::vector<Vec3>& ProfileRecorder::mutablePoints()
+std::vector<Vec3>& ProfileEditor::mutablePoints()
 {
     switch (target_)
     {
@@ -36,7 +36,7 @@ std::vector<Vec3>& ProfileRecorder::mutablePoints()
     return profile_.waypoints;
 }
 
-const std::vector<Vec3>& ProfileRecorder::points(Target t) const
+const std::vector<Vec3>& ProfileEditor::points(Target t) const
 {
     switch (t)
     {
@@ -51,12 +51,12 @@ const std::vector<Vec3>& ProfileRecorder::points(Target t) const
     return profile_.waypoints;
 }
 
-void ProfileRecorder::addWaypoint(const Vec3& position)
+void ProfileEditor::addWaypoint(const Vec3& position)
 {
     mutablePoints().push_back(position);
 }
 
-void ProfileRecorder::moveWaypoint(std::size_t index, const Vec3& position)
+void ProfileEditor::moveWaypoint(std::size_t index, const Vec3& position)
 {
     auto& pts = mutablePoints();
 
@@ -66,7 +66,7 @@ void ProfileRecorder::moveWaypoint(std::size_t index, const Vec3& position)
     }
 }
 
-void ProfileRecorder::removeWaypoint(std::size_t index)
+void ProfileEditor::removeWaypoint(std::size_t index)
 {
     auto& pts = mutablePoints();
 
@@ -76,7 +76,7 @@ void ProfileRecorder::removeWaypoint(std::size_t index)
     }
 }
 
-void ProfileRecorder::insertWaypoint(std::size_t index, const Vec3& position)
+void ProfileEditor::insertWaypoint(std::size_t index, const Vec3& position)
 {
     auto& pts = mutablePoints();
 
@@ -86,7 +86,7 @@ void ProfileRecorder::insertWaypoint(std::size_t index, const Vec3& position)
     }
 }
 
-bool ProfileRecorder::undo()
+bool ProfileEditor::undo()
 {
     auto& pts = mutablePoints();
 
@@ -99,27 +99,9 @@ bool ProfileRecorder::undo()
     return true;
 }
 
-void ProfileRecorder::clear()
+void ProfileEditor::clear()
 {
     mutablePoints().clear();
-}
-
-bool ProfileRecorder::update(const Vec3& position)
-{
-    if (!recording_)
-    {
-        return false;
-    }
-
-    auto& pts = mutablePoints();
-
-    if (pts.empty() || distance(pts.back(), position) >= autoDistance_)
-    {
-        pts.push_back(position);
-        return true;
-    }
-
-    return false;
 }
 
 } // namespace og

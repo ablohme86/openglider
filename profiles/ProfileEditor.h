@@ -8,11 +8,11 @@
  * ============================================================== *
  *
  *  Date: 2026-09-11
- *  File: ProfileRecorder.h
+ *  File: ProfileEditor.h
  *
  *  Desc:
- *  Declarations and interface for ProfileRecorder (glider profile
- *  parsing, validation, and recording).
+ *  Declarations and interface for ProfileEditor (the profile being
+ *  drawn: its grind, ghost and vendor waypoints).
  *
  *
  */
@@ -27,11 +27,9 @@
 namespace og
 {
 
-// Fast profile building:
-//   F7  add waypoint       F9  start automatic recording
-//   F8  undo last          F10 stop recording
-// (hotkeys are wired by the UI; this class holds the logic).
-class ProfileRecorder
+// The profile being edited: waypoints drawn, moved and removed on the map,
+// one route at a time (the UI does the drawing; this class holds the logic).
+class ProfileEditor
 {
 public:
     enum class Target
@@ -40,10 +38,6 @@ public:
         GhostWaypoints,
         VendorWaypoints
     };
-
-    explicit ProfileRecorder(float autoDistance = 15.0f) : autoDistance_(autoDistance)
-    {
-    }
 
     void setTarget(Target t)
     {
@@ -61,36 +55,6 @@ public:
     void insertWaypoint(std::size_t index, const Vec3& position);
     bool undo();
     void clear();
-
-    void startAuto()
-    {
-        recording_ = true;
-    }
-
-    void stopAuto()
-    {
-        recording_ = false;
-    }
-
-    bool isRecording() const
-    {
-        return recording_;
-    }
-
-    void setAutoDistance(float yards)
-    {
-        autoDistance_ = yards;
-    }
-
-    float autoDistance() const
-    {
-        return autoDistance_;
-    }
-
-    // Call with every new player position. In automatic mode a waypoint is
-    // added whenever the player moved more than autoDistance from the last one.
-    // Returns true if a waypoint was added.
-    bool update(const Vec3& position);
 
     const std::vector<Vec3>& points(Target t) const;
     const std::vector<Vec3>& points() const
@@ -123,8 +87,6 @@ private:
 
     GliderProfile profile_;
     Target target_ = Target::Waypoints;
-    float autoDistance_;
-    bool recording_ = false;
 };
 
 } // namespace og
