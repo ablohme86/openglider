@@ -35,7 +35,14 @@ function(og_add_module name)
 
     if(OG_SHARED_ENGINE)
         add_library(${target} OBJECT ${ARG_SOURCES})
-        set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON CXX_VISIBILITY_PRESET default VISIBILITY_INLINES_HIDDEN OFF)
+        set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+        # The library's API is what it exports: everything, inline functions
+        # too (one copy of their statics for the program and the library). As
+        # target options they come after a program's own -fvisibility=hidden.
+        if(NOT MSVC)
+            target_compile_options(${target} PRIVATE -fvisibility=default -fno-visibility-inlines-hidden)
+        endif()
     else()
         add_library(${target} STATIC ${ARG_SOURCES})
     endif()

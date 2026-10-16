@@ -91,7 +91,9 @@ if(OG_SHARED_ENGINE)
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+    # MSVC exports nothing unless asked: every function and class (the engine
+    # has no data a program reaches into directly).
     if(WIN32)
-        set_target_properties(openglider PROPERTIES OUTPUT_NAME OpenGlider)
+        set_target_properties(openglider PROPERTIES OUTPUT_NAME OpenGlider WINDOWS_EXPORT_ALL_SYMBOLS ON)
     endif()
 endif()
