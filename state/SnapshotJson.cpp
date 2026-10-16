@@ -481,6 +481,12 @@ Json toJson(const GameSnapshot& s)
     }
 
     j["zone"] = s.zoneId;
+
+    if (!s.zoneText.empty())
+    {
+        j["zoneText"] = s.zoneText;
+    }
+
     j["player"] = toJson(s.player);
 
     if (s.targetGuid)
@@ -529,6 +535,12 @@ GameSnapshot snapshotFromJson(const Json& j)
     }
 
     s.zoneId = static_cast<std::uint32_t>(j["zone"].asInt());
+
+    if (j["zoneText"].isString())
+    {
+        s.zoneText = j["zoneText"].asString();
+    }
+
     s.player = playerFromJson(j["player"]);
 
     s.targetGuid = guidFromJson(j["target"]);

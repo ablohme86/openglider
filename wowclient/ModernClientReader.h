@@ -89,6 +89,11 @@ public:
     // A UI frame by name, where the layout knows the client's UI (uiTop).
     std::optional<UiFrame> uiFrame(std::string_view name) const;
     std::optional<std::string> uiText(std::string_view frame, std::string_view fontString) const;
+    // The minimap's zone text: the subzone the character stands in
+    // ("Northshire Valley"), or the zone where it is in none. Its font string
+    // sits in a frame without a global name, so it is looked for once and
+    // read where it was found from then on.
+    std::optional<std::string> minimapZoneText() const;
     std::optional<UiFrame> uiRegion(std::string_view frame, std::string_view region) const;
     // A Cooldown frame's start (gameTime's clock) and duration, in ms; both 0
     // while it shows none. nullopt where the frame is not found.
@@ -184,6 +189,7 @@ private:
     void loadActionButtonTable() const;
     mutable bool actionButtonTableLoaded_ = false;
     mutable std::unordered_map<std::string, std::uint64_t> uiObjects_;
+    mutable std::uint64_t minimapZoneRegion_ = 0;
 
     // Other players' names by GUID, walked out of the client's name cache at
     // most every two seconds, and only while a player nearby has none.

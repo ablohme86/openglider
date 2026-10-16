@@ -353,6 +353,7 @@ private:
     std::map<std::string, int> objectiveWanted_; // the game's objective counts, by lower-case name
     std::map<std::string, std::vector<PlayerState::TrackedObjective>> trackedQuests_; // the quest tracker's lines, by title
     Guid objectiveWantedOf_ = 0;                 // the character they are of
+    std::string zoneText_;                       // the minimap's zone text at the last read
     bool breathShown_ = false;                   // the breath bar at the last read
     bool spellErrorHookInstalled_ = false;
     std::uint32_t spellErrorCVarAddress_ = 0;
