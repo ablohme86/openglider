@@ -3116,7 +3116,7 @@ std::string WowMemoryStateProvider::describe()
 
     const PlayerState& p = snap->player;
     out += std::format("player '{}' {} level {} class {} race {} faction template {} hp {}/{} power {}/{} ({})\n", p.name, formatGuid(p.guid), p.level, toString(p.playerClass), p.race, p.factionTemplate, p.health, p.maxHealth, p.power, p.maxPower, toString(p.powerType));
-    out += std::format("position {} heading {:.2f} map {} zone {} \"{}\" combat={} autoAttack={} shooting={} dead={} ghost={}\n", p.position, p.heading, snap->mapId ? std::to_string(*snap->mapId) : "?", snap->zoneId, snap->zoneText, p.inCombat, p.isAutoAttacking, p.isShooting, p.isDead, p.isGhost);
+    out += std::format("position {} heading {:.2f} map {} zone {} \"{}\" combat={} autoAttack={} shooting={} dead={} ghost={} sitting={}\n", p.position, p.heading, snap->mapId ? std::to_string(*snap->mapId) : "?", snap->zoneId, snap->zoneText, p.inCombat, p.isAutoAttacking, p.isShooting, p.isDead, p.isGhost, p.isSitting);
 
     out += std::format("xp {}/{}  target {}  auras {}  broken items {}  money {}\n", p.xp, p.nextLevelXp, formatGuid(snap->targetGuid), p.auras.size(), p.brokenItems, p.money < 0 ? std::string("?") : std::format("{}g {}s {}c", p.money / 10000, p.money / 100 % 100, p.money % 100));
 

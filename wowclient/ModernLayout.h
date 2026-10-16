@@ -125,6 +125,7 @@ struct ModernLayout
     // modern::QuestGiver*. 0: not known.
     std::uint32_t unitQuestGiverStatus = 0;
     std::uint32_t unitBytes0 = 0;          // race, class
+    std::uint32_t unitBytes1 = 0;          // its low byte the stand state: 1-6 sat (0: not known)
     std::uint32_t unitLevel = 0;           // u32
     std::uint32_t unitFactionTemplate = 0; // u32
     std::uint32_t unitFlags = 0;           // u32, same bits as the older clients

@@ -491,6 +491,15 @@ void ModernClientReader::readPlayer(const Object& obj, PlayerState& p) const
     const auto bytes0 = memory_.read<std::uint32_t>(obj.base + L_.unitBytes0).value_or(0);
     p.playerClass = static_cast<PlayerClass>((bytes0 >> 8) & 0xFF);
     p.race = static_cast<int>(bytes0 & 0xFF);
+
+    // Stand state: 1 sat on the ground, 2-6 on a chair or a bed, kneeling
+    // (1.60.1: 0 -> 1 on /sit, back on /stand).
+    if (L_.unitBytes1)
+    {
+        const std::uint8_t standState = memory_.read<std::uint8_t>(obj.base + L_.unitBytes1).value_or(0);
+        p.isSitting = standState >= 1 && standState <= 6;
+    }
+
     p.setPower(p.powerType, p.power, p.maxPower);
     p.reaction = Reaction::Friendly;
 
