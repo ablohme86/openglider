@@ -1,0 +1,50 @@
+/*
+ * ============================================================== *
+ *  OpenGlider                                                    *
+ *  Copyright (c) 2026 Alexander Blohmè <alexander.blohme@gmail.com> *
+ *  SPDX-License-Identifier: LGPL-3.0-or-later                    *
+ *  Licensed under the GNU Lesser General Public License,         *
+ *  version 3 or later. See COPYING.LESSER and COPYING.           *
+ * ============================================================== *
+ *
+ *  Date: 2026-09-11
+ *  File: FileUtil.h
+ *
+ *  Desc:
+ *  Declarations and interface for FileUtil (common utility functions,
+ *  math, logging, and data structures).
+ *
+ *
+ */
+#pragma once
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+
+namespace og
+{
+
+std::optional<std::string> readTextFile(const std::filesystem::path& path);
+bool writeTextFile(const std::filesystem::path& path, const std::string& content);
+
+// The application OpenGlider is built into (OG_APP_NAME, "OpenGlider" unless
+// the parent project sets it), as shown to the user, and in lower case as the
+// name of its directories.
+std::string_view applicationName();
+std::string applicationDirectoryName();
+
+// ~/.config/<app> on Linux, %APPDATA%/<App> on Windows.
+std::filesystem::path defaultConfigDirectory();
+
+// The directory the running executable sits in, so a package can find the data
+// it ships whatever the working directory is. Empty when it cannot be
+// determined, which callers must treat as "no such directory".
+std::filesystem::path executableDirectory();
+
+// As given, user config, packaged data beside the executable, then the
+// configured development data directory. Shared by apps and data readers.
+std::filesystem::path resolveDataFile(const std::string& path);
+
+} // namespace og
