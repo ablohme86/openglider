@@ -92,6 +92,9 @@ private:
         // second - from one tick to the next a car standing at a stop wobbled
         // by as much as one starting off moves.
         Vec3 sample;
+        // Where it was first seen: a car goes up and down on the spot, a
+        // boat or a zeppelin about the world.
+        Vec3 first;
         TimePoint sampleAt{};
         TimePoint movedAt{};
         TimePoint seenAt{};

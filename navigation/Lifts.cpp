@@ -55,7 +55,9 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
 
 bool LiftWatch::isLift(const GameObjectState& object)
 {
-    return object.name.find("Elevator") != std::string::npos;
+    // Thunder Bluff's "Mesa Elevator", "The Great Lift", or any transport -
+    // a boat or a zeppelin too, which is never learnt for one: it goes about.
+    return object.kind == GameObjectKind::Transport || object.name.find("Elevator") != std::string::npos || object.name.find("Lift") != std::string::npos;
 }
 
 void LiftWatch::update(const GameSnapshot& snapshot)
@@ -80,7 +82,7 @@ void LiftWatch::update(const GameSnapshot& snapshot)
         {
             // How long it has stood still is not known until it has been seen
             // coming in: a car found standing may be about to leave.
-            seen_.push_back({o.guid, *snapshot.mapId, o.position, o.position.z, o.position.z, o.position, now, TimePoint{}, now});
+            seen_.push_back({o.guid, *snapshot.mapId, o.position, o.position.z, o.position.z, o.position, o.position, now, TimePoint{}, now});
             continue;
         }
 
@@ -111,7 +113,7 @@ void LiftWatch::update(const GameSnapshot& snapshot)
 
         const bool known = std::any_of(lifts_.begin(), lifts_.end(), [&](const Lift& l) { return l.mapId == s.mapId && std::hypot(l.x - s.at.x, l.y - s.at.y) <= kSameShaft; });
 
-        if (!known && s.high - s.low >= kRise)
+        if (!known && s.high - s.low >= kRise && distance2D(s.at, s.first) <= kSameShaft)
         {
             lifts_.push_back({s.mapId, s.at.x, s.at.y, s.low, s.high});
         }

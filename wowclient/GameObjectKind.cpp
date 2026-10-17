@@ -47,7 +47,7 @@ bool containsAny(const std::string& s, std::initializer_list<const char*> words)
 
 bool keptAtAnyDistance(const GameObjectState& object)
 {
-    return object.kind == GameObjectKind::Transport || object.name.find("Elevator") != std::string::npos;
+    return object.kind == GameObjectKind::Transport || object.name.find("Elevator") != std::string::npos || object.name.find("Lift") != std::string::npos;
 }
 
 GameObjectKind classifyGameObject(std::uint8_t type, const std::string& name)
