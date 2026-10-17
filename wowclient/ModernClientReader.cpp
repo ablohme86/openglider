@@ -2134,7 +2134,7 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
         {
             GameObjectState g;
 
-            if (readGameObject(obj, g) && distance(g.position, s.player.position) <= visibilityRange)
+            if (readGameObject(obj, g) && (distance(g.position, s.player.position) <= visibilityRange || keptAtAnyDistance(g)))
             {
                 s.objects.push_back(std::move(g));
             }

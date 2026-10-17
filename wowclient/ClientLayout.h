@@ -257,6 +257,8 @@ inline constexpr std::uint32_t TypeCorpse = 7;
 inline constexpr std::uint8_t GoTypeDoor = 0;
 inline constexpr std::uint8_t GoTypeChest = 3; // also herbs and mining veins
 inline constexpr std::uint8_t GoTypeGeneric = 5;
+inline constexpr std::uint8_t GoTypeTransport = 11;
+inline constexpr std::uint8_t GoTypeMoTransport = 15;
 inline constexpr std::uint8_t GoTypeFishingNode = 17;
 inline constexpr std::uint8_t GoTypeFishingHole = 25;
 } // namespace consts

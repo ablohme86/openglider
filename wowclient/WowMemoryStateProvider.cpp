@@ -1278,7 +1278,7 @@ std::optional<GameSnapshot> WowMemoryStateProvider::capture()
         {
             GameObjectState g;
 
-            if (readGameObject(obj, g) && distance(g.position, s.player.position) <= config_.visibilityRange)
+            if (readGameObject(obj, g) && (distance(g.position, s.player.position) <= config_.visibilityRange || keptAtAnyDistance(g)))
             {
                 s.objects.push_back(std::move(g));
             }

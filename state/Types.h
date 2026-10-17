@@ -143,6 +143,8 @@ enum class GameObjectKind : std::uint8_t
     Mineral,
     FishingBobber,
     FishingHole,
+    // A lift's car, a boat, a zeppelin: it carries those on it about.
+    Transport,
 };
 
 std::string_view toString(PlayerClass c);

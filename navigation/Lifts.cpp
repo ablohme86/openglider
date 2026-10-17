@@ -48,6 +48,9 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
     // side, measured going up and down (the WoW Forever client, October 2026).
     lifts_.push_back({kKalimdor, -1286.24f, 189.72f, 68.84f, 130.04f});
     lifts_.push_back({kKalimdor, -1308.38f, 185.29f, 68.59f, 130.08f});
+    // And the two on the east side of the mesa.
+    lifts_.push_back({kKalimdor, -1037.27f, -49.24f, 69.27f, 140.49f});
+    lifts_.push_back({kKalimdor, -1028.04f, -28.36f, 69.02f, 140.50f});
 }
 
 bool LiftWatch::isLift(const GameObjectState& object)
