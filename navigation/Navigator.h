@@ -404,7 +404,10 @@ private:
             Leaving
         } stage = Stage::ToStop;
         TimePoint since{};
-        std::optional<Vec3> stepOff;
+        // Ground by the shaft on the map, where the car is waited for, and
+        // where it is stepped off to: the shaft itself is no ground on it.
+        Vec3 waitAt;
+        Vec3 stepOffTo;
     };
     LiftWatch lifts_;
     std::optional<LiftRide> ride_;
