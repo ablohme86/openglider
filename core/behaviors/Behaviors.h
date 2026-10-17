@@ -999,6 +999,12 @@ private:
     TimePoint started_{}, talkedAt_{};
     int talks_ = 0;
     bool gossipChosen_ = false;
+    // Without Lua (1.60.1) talked to as a trainer is: a right-click on it
+    // under the mouse, the interact key where the mouse finds nothing, and
+    // right up to it after a talk that came to nothing.
+    int rightClicks_ = 0;
+    bool mouseTried_ = false;
+    bool closeIn_ = false;
     // Flight masters tried and given up on, not again until then.
     std::map<Guid, TimePoint> notBefore_;
 };

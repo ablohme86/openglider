@@ -34,6 +34,7 @@ const Duration kRetryAfter{600000};
 // Between talking and the flight map, and between one try and the next.
 const Duration kAnswer{2500};
 constexpr int kTalks = 4;
+constexpr float kCloseIn = 1.5f;
 
 const UnitState* flightMaster(const GameSnapshot& s, Guid guid)
 {
@@ -132,8 +133,8 @@ void FlightMasterBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
     npcName_ = best->name;
     started_ = now;
     talkedAt_ = TimePoint{};
-    talks_ = 0;
-    gossipChosen_ = false;
+    talks_ = rightClicks_ = 0;
+    gossipChosen_ = mouseTried_ = closeIn_ = false;
     ctx.log.info(logcat::Profile, "learn flight path: {} has a flight path not learnt ({:.0f} yd) - going to talk to them", npcName_, distance(s.player.position, best->position));
     ctx.objectives.push(Objective{"Learn Flight Path", 0, best->position});
     ctx.combat.defendOnly = true;
@@ -143,6 +144,8 @@ void FlightMasterBehavior::onExit(BotContext& ctx)
 {
     ctx.navigator.stop();
     ctx.cancelInteraction();
+    ctx.stopMouseSeek();
+    ctx.restoreCamera();
     ctx.combat.defendOnly = false;
 }
 
@@ -152,7 +155,24 @@ BehaviorStatus FlightMasterBehavior::finish(BotContext& ctx, const std::string& 
     ctx.movement.stop();
     ctx.objectives.pop("Learn Flight Path");
     ctx.combat.defendOnly = false;
-    ctx.runScript(kCloseMap);
+    ctx.stopMouseSeek();
+    ctx.restoreCamera();
+
+    // The flight map, or a gossip, that talking opened: shut.
+    if (ctx.provider && ctx.provider->supportsLua())
+    {
+        ctx.runScript(kCloseMap);
+    }
+    else
+    {
+        for (const auto* close : {"TaxiFrameCloseButton", "FlightMapFrameCloseButton", "GossipFrameCloseButton"})
+        {
+            if (ctx.uiFrameVisible(close))
+            {
+                ctx.clickUiFrame(close);
+            }
+        }
+    }
 
     if (failed)
     {
@@ -210,7 +230,7 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
         return BehaviorStatus::Running;
     }
 
-    const float reach = ctx.humanReach(ctx.config.interactDistance, npc->guid);
+    const float reach = closeIn_ ? kCloseIn : ctx.humanReach(ctx.config.interactDistance, npc->guid);
 
     if (distance(s.player.position, npc->position) > reach)
     {
@@ -224,9 +244,10 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
     ctx.navigator.stop();
     ctx.movement.stop();
+    const bool lua = ctx.provider && ctx.provider->supportsLua();
 
     // A gossip first, where it has one: the flight line chosen once.
-    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
+    if (lua && ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
     {
         ctx.runScript(kChooseFlight);
         gossipChosen_ = true;
@@ -234,19 +255,75 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
         return BehaviorStatus::Running;
     }
 
-    if (talkedAt_ == TimePoint{} || now - talkedAt_ >= kAnswer)
+    // Talked to, and the "!" still there: once more - after the first, from
+    // right up to it.
+    if (talkedAt_ != TimePoint{} && now - talkedAt_ < kAnswer)
     {
-        if (talks_ >= kTalks)
-        {
-            return finish(ctx, "talking opened nothing", true);
-        }
-
-        ++talks_;
-        gossipChosen_ = false;
-        talkedAt_ = now;
-        ctx.interactNpc(npc->guid, npc->position);
+        return BehaviorStatus::Running;
     }
 
+    if (talks_ >= kTalks)
+    {
+        return finish(ctx, "talking learnt nothing", true);
+    }
+
+    if (talks_ >= 1 && !closeIn_ && distance(s.player.position, npc->position) > kCloseIn + 0.5f)
+    {
+        closeIn_ = true;
+        return BehaviorStatus::Running;
+    }
+
+    if (!ctx.movement.face(s.player, npc->position, 0.4f))
+    {
+        return BehaviorStatus::Running;
+    }
+
+    if (lua)
+    {
+        gossipChosen_ = false;
+        ctx.interactNpc(npc->guid, npc->position);
+    }
+    else
+    {
+        // No Lua (1.60.1): a right-click on it under the mouse - which learns
+        // the flight path; where the mouse finds nothing, the interact key.
+        if (!mouseTried_ && ctx.zoomInForClick(rightClicks_))
+        {
+            return BehaviorStatus::Running;
+        }
+
+        const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : ctx.seekUnderMouse(npc_, s.player, npc->position, 0.9f);
+
+        if (seek == BotContext::MouseSeek::Searching)
+        {
+            return BehaviorStatus::Running;
+        }
+
+        if (seek == BotContext::MouseSeek::Found)
+        {
+            ctx.actions.click(MouseButton::Right);
+            ctx.stopMouseSeek();
+            ++rightClicks_;
+        }
+        else
+        {
+            if (seek == BotContext::MouseSeek::NotFound)
+            {
+                ctx.stopMouseSeek();
+            }
+
+            mouseTried_ = true;
+
+            if (ctx.actions.execute(actions::Interact) != ActionResult::Executed)
+            {
+                return BehaviorStatus::Running;
+            }
+        }
+    }
+
+    ++talks_;
+    talkedAt_ = now;
+    ctx.log.info(logcat::Profile, "learn flight path: talking to {}", npcName_);
     return BehaviorStatus::Running;
 }
 
