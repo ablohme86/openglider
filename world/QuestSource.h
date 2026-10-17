@@ -110,9 +110,12 @@ public:
     // "The Great Outdoors" and that to "Camping 101: Cooking" (and the other
     // professions). Talking to trainers the bot has no use for.
     bool isCampingQuest(std::uint32_t questId) const;
+    // A quest the bot cannot do, by its name: "Kyle's Gone Missing!" has Kyle
+    // the dog found and fed a treat as he runs about Bloodhoof Village.
+    bool isQuestTheBotCannotDo(std::uint32_t questId) const;
     bool isAutoIgnored(std::uint32_t questId) const override
     {
-        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId);
+        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId) || isQuestTheBotCannotDo(questId);
     }
     void setEliteEntries(std::shared_ptr<const std::unordered_set<std::uint32_t>> entries) override
     {

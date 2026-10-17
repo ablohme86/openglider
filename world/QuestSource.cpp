@@ -1014,6 +1014,12 @@ bool QuestSource::isCampingQuest(std::uint32_t questId) const
     return name == "The Adventurer" || name == "The Great Outdoors" || name.starts_with("Camping 101:");
 }
 
+bool QuestSource::isQuestTheBotCannotDo(std::uint32_t questId) const
+{
+    const auto it = quests_.find(questId);
+    return it != quests_.end() && it->second.name == "Kyle's Gone Missing!";
+}
+
 bool QuestSource::isEliteQuest(std::uint32_t questId) const
 {
     const auto it = quests_.find(questId);

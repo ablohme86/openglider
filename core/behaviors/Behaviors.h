@@ -430,6 +430,9 @@ private:
     bool pullFinished_ = false;
     bool pullActionExecuted_ = false;
     TimePoint pullActionAt_{}; // when the last pull rule went off
+    // The target that fled, until it is dead or gone: fought first again
+    // once it is back, before the mob fought meanwhile.
+    Guid fled_ = 0;
     Guid tappedGuid_ = 0;      // the target seen tagged by another player, since
     TimePoint tappedSince_{};
     std::optional<TimePoint> autoRepeatStartedAt_;
@@ -477,7 +480,9 @@ private:
     bool closingIn_ = false;
     // Stepping away, mid-fight, from a mob too strong to fight that stands or
     // comes within reach of noticing us.
-    bool dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
+    // adds: away from a mob that would join the fight too, not only from one
+    // too strong to fight.
+    bool dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, bool adds = true);
     void stopDodging(BotContext& ctx);
     bool dodging_ = false;
     int dodgeStrafe_ = 0; // 1 left, -1 right
