@@ -51,6 +51,13 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
     // And the two on the east side of the mesa.
     lifts_.push_back({kKalimdor, -1037.27f, -49.24f, 69.27f, 140.49f});
     lifts_.push_back({kKalimdor, -1028.04f, -28.36f, 69.02f, 140.50f});
+    // The Great Lift, from the Barrens down to Thousand Needles: two cars
+    // side by side.
+    lifts_.push_back({kKalimdor, -4670.77f, -1849.61f, -44.14f, 85.41f});
+    lifts_.push_back({kKalimdor, -4665.43f, -1827.68f, -43.89f, 85.41f});
+    // Freewind Post's, from the Needles up to the mesa.
+    lifts_.push_back({kKalimdor, -5382.49f, -2489.42f, -40.53f, 89.03f});
+    lifts_.push_back({kKalimdor, -5399.19f, -2504.61f, -40.28f, 89.02f});
 }
 
 bool LiftWatch::isLift(const GameObjectState& object)

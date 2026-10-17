@@ -11,7 +11,7 @@
  *  File: Lifts.h
  *
  *  Desc:
- *  The lifts of Thunder Bluff and Undercity: where they stop below and
+ *  The lifts of Thunder Bluff, the Needles and Undercity: where they stop below and
  *  above, and where each car is now.
  *
  *

@@ -23,6 +23,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <span>
 #include <random>
 #include <utility>
@@ -360,6 +361,9 @@ float lengthOf(const Vec3& from, const Path& path)
 
 // Lifts this far from a destination are looked at for a way to it.
 constexpr float kLiftReach = 600.0f;
+// What a lift trip costs over its length, as yards walked: waiting for the
+// car and riding it, up to some 30 s.
+constexpr float kLiftDetour = 200.0f;
 // The car stands 5 s at a stop: gone on to it only in the first 2.
 constexpr Duration kBoardWithin{2000};
 constexpr Duration kLiftWaitLongest{90000};
@@ -372,9 +376,19 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
     const Vec3& from = snapshot.player.position;
     const auto near = [&](const Lift& l) { return snapshot.mapId && l.mapId == *snapshot.mapId && std::hypot(l.x - to.x, l.y - to.y) <= kLiftReach; };
 
-    if (std::none_of(lifts_.lifts().begin(), lifts_.lifts().end(), near) || reaches(provider_->findPath(from, to), to))
+    if (std::none_of(lifts_.lifts().begin(), lifts_.lifts().end(), near))
     {
         return std::nullopt;
+    }
+
+    // A way the map has is taken unless the lift is much the shorter: up to
+    // Freewind Post from below the map has one round by the slopes to the
+    // west, some 700 yd, and the lift is a few steps off.
+    float mapWay = std::numeric_limits<float>::max();
+
+    if (const auto direct = provider_->findPath(from, to); reaches(direct, to))
+    {
+        mapWay = lengthOf(from, *direct);
     }
 
     std::optional<LiftRide> best;
@@ -392,18 +406,46 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
         const Vec3 on = lift.stop(fromTop);
         const Vec3 off = lift.stop(!fromTop);
 
-        // Ground by each stop: the map has the edge of the shaft, not its middle.
-        const auto onGround = provider_->findWalkablePoint(on, Lift::kFloor + 2.0f, 0.0f);
-        const auto offGround = provider_->findWalkablePoint(off, Lift::kFloor + 2.0f, 0.0f);
-
-        if (!onGround || !offGround || std::fabs(onGround->z - on.z) > 3.0f || std::fabs(offGround->z - off.z) > 3.0f)
+        // Ground by each stop at its height: the map has the edge of the
+        // shaft, not its middle - and under the middle maybe the pit the car
+        // goes down into (the Great Lift's, 5 yd under its floor below). Round
+        // it then, though some of what is round it is cut off: beside the
+        // Great Lift's cars below, a ledge between the two shafts.
+        const auto groundBy = [&](const Vec3& stop)
         {
-            continue;
+            std::vector<Vec3> grounds;
+            const auto add = [&](const std::optional<Vec3>& g)
+            {
+                if (g && std::fabs(g->z - stop.z) <= 3.0f)
+                {
+                    grounds.push_back(*g);
+                }
+            };
+            add(provider_->findWalkablePoint(stop, Lift::kFloor + 2.0f, 0.0f));
+
+            for (int i = 0; i < 12; ++i)
+            {
+                const float h = static_cast<float>(i) * kTwoPi / 12;
+                add(provider_->findWalkablePoint(stop + Vec3{std::cos(h), std::sin(h), 0.0f} * (Lift::kFloor + 1.0f), 2.0f, 0.0f));
+            }
+
+            return grounds;
+        };
+
+        std::optional<Vec3> onGround;
+        std::optional<Path> toLift;
+
+        for (const Vec3& g : groundBy(on))
+        {
+            if (auto way = provider_->findPath(from, g); reaches(way, g))
+            {
+                onGround = g;
+                toLift = std::move(way);
+                break;
+            }
         }
 
-        const auto toLift = provider_->findPath(from, *onGround);
-
-        if (!reaches(toLift, *onGround))
+        if (!onGround)
         {
             continue;
         }
@@ -424,14 +466,24 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
         }
 
         std::optional<Path> fromLift;
+        std::optional<Vec3> offGround;
         Vec3 there = to;
 
-        for (const Vec3& place : places)
+        for (const Vec3& g : groundBy(off))
         {
-            if (auto way = provider_->findPath(*offGround, place); reaches(way, place))
+            for (const Vec3& place : places)
             {
-                fromLift = std::move(way);
-                there = place;
+                if (auto way = provider_->findPath(g, place); reaches(way, place))
+                {
+                    fromLift = std::move(way);
+                    offGround = g;
+                    there = place;
+                    break;
+                }
+            }
+
+            if (fromLift)
+            {
                 break;
             }
         }
@@ -443,7 +495,7 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
 
         const float length = lengthOf(from, *toLift) + lengthOf(*offGround, *fromLift);
 
-        if (!best || length < bestLength)
+        if ((!best || length < bestLength) && length + kLiftDetour < mapWay)
         {
             // Off the car's floor, on the side the ground is: it comes down
             // onto where it stops. Stepped off the same way at the other stop.
@@ -477,7 +529,8 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             // The way off: round the other stop every 5 degrees, how far out
             // the map has ground at its height. The farthest, and of those the
             // middle of the widest run of headings (on a plank, its middle) -
-            // the one towards the destination where runs are alike.
+            // the one towards the destination where runs are alike. Ground
+            // cut off from the way on is none.
             constexpr int kSteps = 72;
             std::array<float, kSteps> reach{};
 
@@ -485,6 +538,7 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             {
                 const float h = static_cast<float>(i) * kTwoPi / kSteps;
                 const Vec3 d{std::cos(h), std::sin(h), 0.0f};
+                std::optional<Vec3> last;
 
                 for (float out = Lift::kFloor + 1.0f; out <= 16.0f; out += 2.0f)
                 {
@@ -496,6 +550,12 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                     }
 
                     reach[i] = out;
+                    last = g;
+                }
+
+                if (last && !reaches(provider_->findPath(*last, *offGround), *offGround))
+                {
+                    reach[i] = 0.0f;
                 }
             }
 
