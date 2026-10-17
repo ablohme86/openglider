@@ -31,6 +31,7 @@ og_add_module(core
         behaviors/InventoryQuestBehavior.cpp
         behaviors/QuestHandInBehavior.cpp
         behaviors/TrainerBehavior.cpp
+        behaviors/FlightMasterBehavior.cpp
         behaviors/AutoEquipBehavior.cpp
         behaviors/DeathBehavior.cpp
         behaviors/ResurrectEscapeBehavior.cpp

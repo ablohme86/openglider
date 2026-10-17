@@ -96,6 +96,10 @@ struct UnitState
     bool isAttackable = true; // false for vendors, quest givers, guards and other NPCs you cannot attack
     bool isVendor = false;    // sells goods (NPC flag), so the bot can unload at it
     bool canRepair = false;   // also repairs (NPC flag)
+    bool isFlightMaster = false; // flies players about (NPC flag)
+    // A flight master whose flight path the character has not learnt: the
+    // green "!" over its head.
+    bool newFlightPath = false;
     QuestMarker questMarker = QuestMarker::None;
 
     Guid targetGuid = 0;

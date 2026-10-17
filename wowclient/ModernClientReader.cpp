@@ -401,6 +401,7 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
         const auto npcFlags = field<std::uint32_t>(f, L_.unitNpcFlags - at);
         u.isVendor = (npcFlags & modern::NpcFlagVendor) != 0;
         u.canRepair = (npcFlags & modern::NpcFlagRepair) != 0;
+        u.isFlightMaster = (npcFlags & modern::NpcFlagFlightMaster) != 0;
 
         // A vendor, trainer or quest giver is no mob to pull.
         if (npcFlags != 0)

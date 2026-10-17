@@ -970,6 +970,39 @@ private:
 // the character's class (by the quest data), through its gossip line to the
 // trainer window, and every spell it lists learned that the money allows -
 // a row chosen, Train clicked, and the money seen to go down.
+// A flight master in sight whose flight path the character has not learnt
+// (the green "!" over its head): walked to and talked to, which learns it,
+// and the flight map that opens closed again.
+class FlightMasterBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "Learn Flight Path";
+    }
+
+    int priority() const override
+    {
+        return priority::LearnFlightPath;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+private:
+    BehaviorStatus finish(BotContext& ctx, const std::string& reason, bool failed);
+
+    Guid npc_ = 0;
+    std::string npcName_;
+    TimePoint started_{}, talkedAt_{};
+    int talks_ = 0;
+    bool gossipChosen_ = false;
+    // Flight masters tried and given up on, not again until then.
+    std::map<Guid, TimePoint> notBefore_;
+};
+
 class TrainerBehavior final : public IBotBehavior
 {
 public:

@@ -47,6 +47,7 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
     out.push_back(std::make_unique<CampfireBehavior>());
     out.push_back(std::make_unique<VendorBehavior>());
     out.push_back(std::make_unique<InventoryQuestBehavior>());
+    out.push_back(std::make_unique<FlightMasterBehavior>());
     out.push_back(std::make_unique<QuestHandInBehavior>());
     out.push_back(std::make_unique<TrainerBehavior>());
     out.push_back(std::make_unique<AutoEquipBehavior>());

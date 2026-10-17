@@ -247,6 +247,7 @@ inline constexpr std::uint32_t UnitDynFlagTappedByOther = 0x10;
 
 inline constexpr std::uint32_t NpcFlagVendor = 0x80;
 inline constexpr std::uint32_t NpcFlagRepair = 0x1000;
+inline constexpr std::uint32_t NpcFlagFlightMaster = 0x2000;
 
 // The quest marker's bits, seen on 1.60.1 while quests were taken and handed
 // in: 0x15 and 0x16 a yellow !, 0x22 a yellow ?, 0x0D a grey ?, 0 none. The
