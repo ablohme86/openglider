@@ -82,7 +82,7 @@ private:
     TaxiPlan plan_;
     std::uint32_t mapId_ = 0;
     Stage stage_ = Stage::ToMaster;
-    TimePoint started_{}, stageAt_{}, talkedAt_{}, clickedAt_{}, stillSince_{};
+    TimePoint started_{}, stageAt_{}, talkedAt_{}, clickedAt_{}, stillSince_{}, mapSeenAt_{};
     Guid master_ = 0;
     int talks_ = 0, clicks_ = 0, rightClicks_ = 0;
     bool mouseTried_ = false, closeIn_ = false, gossipChosen_ = false;

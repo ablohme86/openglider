@@ -55,6 +55,10 @@ const Duration kTimeout{240000};    // to the flight master and talking
 const Duration kAnswer{2500};       // a talk or a click and what it opens
 const Duration kTakeOff{6000};      // a flight point clicked and still on the ground
 const Duration kLanded{3000};       // standing this long after flying: landed
+// The flight map just up: its buttons laid out a moment later - read at once
+// the first time after attaching, none was where its flight point is.
+const Duration kMapSettles{1000};
+const Duration kMapLooked{4000};    // the flight point looked for this long
 constexpr int kTalks = 4;
 constexpr int kClicks = 2;
 
@@ -193,7 +197,12 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
     // The flight map up: the flight point clicked.
     if (ctx.uiFrameVisible("TaxiFrame"))
     {
-        if (now - clickedAt_ < kAnswer)
+        if (mapSeenAt_ == TimePoint{})
+        {
+            mapSeenAt_ = now;
+        }
+
+        if (now - clickedAt_ < kAnswer || now - mapSeenAt_ < kMapSettles)
         {
             return Status::Running;
         }
@@ -221,6 +230,12 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
 
         if (!button)
         {
+            // Looked for again a while, the map still settling.
+            if (now - mapSeenAt_ < kMapLooked)
+            {
+                return Status::Running;
+            }
+
             return fail(ctx, std::format("flight point {} not found on the flight map ({} shown)", plan_.to, buttons.size()));
         }
 
@@ -238,6 +253,9 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
         return Status::Running;
     }
+
+    // The flight map shut: looked at anew when it opens again.
+    mapSeenAt_ = TimePoint{};
 
     // The flight master: by its flight point.
     const UnitState* master = nullptr;
