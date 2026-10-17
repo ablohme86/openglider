@@ -455,7 +455,12 @@ std::vector<std::uint8_t> parseAdtRoadCells(Bytes tex0)
                            }
                        }
 
-                       if (sum * 2 >= 255 * 64)
+                       // A quarter of the cell: the roads of Mulgore and the
+                       // Barrens are narrow and fade into the grass at their
+                       // edges, and at half of it the road from Thunder Bluff to
+                       // Camp Taurajo was 6 polygons in bits, the way across the
+                       // open ground beside it - now some 560.
+                       if (sum * 4 >= 255 * 64)
                        {
                            cells[chunkIndex * 64 + r * 8 + c] = 1;
                            any = true;

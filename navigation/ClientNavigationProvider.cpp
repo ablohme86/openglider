@@ -222,6 +222,12 @@ constexpr float kRoadNearGoal = 50;
 // not much longer. Near the destination they cost as much as any ground.
 constexpr unsigned char kRoadArea = 2; // area id while building; 2 in the mesh
 constexpr float kRoadCost = 0.6f;
+// From this far, roads cost kLongRoadCost: across the Barrens from Thunder
+// Bluff to Camp Taurajo the way kept to the road for 3 of 154 polygons, the
+// open ground straight across cheaper than the road round. A long way keeps
+// to the roads it can, a short one only where they are hardly longer.
+constexpr float kLongRoadFrom = 300;
+constexpr float kLongRoadCost = 0.25f;
 // The costs, scaled so none is under 1: Detour's search takes a yard to cost
 // at least 1, and with the road cheaper it went straight across the field.
 // The bed of water deep enough to swim: a bridge, or the way round, rather
@@ -341,9 +347,10 @@ private:
     std::vector<dtPolyRef> closed_;
 };
 
-void setCosts(dtQueryFilter& filter, bool far, bool roads, bool avoidWater)
+void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater)
 {
-    const float ground = far && roads ? 1 / kRoadCost : 1.0f;
+    const bool far = span > kRoadNearGoal;
+    const float ground = far && roads ? 1 / (span > kLongRoadFrom ? kLongRoadCost : kRoadCost) : 1.0f;
     filter.setAreaCost(0, ground);
     filter.setAreaCost(1, kSteepCost * ground);
     filter.setAreaCost(2, far && roads ? 1.0f : ground);
@@ -964,7 +971,7 @@ struct ClientNavigationProvider::Impl
 
             dtQueryFilter filter;
             filter.setIncludeFlags(1);
-            setCosts(filter, true, roads, avoidWater);
+            setCosts(filter, distance2D(from, to), roads, avoidWater);
             const auto roadGoal = roads && clipped ? coarseRoadGoal(goal, from, to, kCoarse.tile) : std::nullopt;
             // A nearby road may belong to a disconnected surface. Retain the
             // original endpoint as a fallback rather than losing a valid way.
@@ -1263,7 +1270,7 @@ std::optional<Path> ClientNavigationProvider::findPath(const Vec3& from, const V
             dtPolyRef first = 0, last = 0;
             dtQueryFilter filter;
             filter.setIncludeFlags(1);
-            setCosts(filter, distance2D(from, to) > kRoadNearGoal, useRoads_, avoidWater_);
+            setCosts(filter, distance2D(from, to), useRoads_, avoidWater_);
             // What the caller asked this way to keep out of (setAvoiding).
             std::vector<Closed::Circle> circles;
 
