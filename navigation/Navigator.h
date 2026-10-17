@@ -417,6 +417,9 @@ private:
         // Ground by the shaft on the map, where the car is waited for, and
         // where it is stepped off to: the shaft itself is no ground on it.
         Vec3 waitAt;
+        // The gate onto the car at the stop got on at, where one is known:
+        // walked through its middle before the car's.
+        std::optional<Vec3> gateAt;
         Vec3 stepOffTo;
         // The way off the car at the other stop, found when the trip is
         // planned: the heading from the car's middle along which the map has

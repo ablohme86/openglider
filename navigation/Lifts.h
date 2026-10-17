@@ -45,6 +45,17 @@ struct Lift
     // off their middle.
     static constexpr float kFloor = 5.0f;
     float floor = kFloor;
+    // Where a gate onto the car stands, as a heading from its middle, at the
+    // stop below and above: got on and off straight through it. Undercity's
+    // gates are no wider than the character's way through them, and going
+    // in at a slant it ran into the frame.
+    std::optional<float> lowerGate;
+    std::optional<float> upperGate;
+
+    std::optional<float> gate(bool upper) const
+    {
+        return upper ? upperGate : lowerGate;
+    }
 
     Vec3 stop(bool upper) const
     {

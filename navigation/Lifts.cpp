@@ -61,10 +61,12 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
     lifts_.push_back({kKalimdor, -5399.19f, -2504.61f, -40.28f, 89.02f});
     // Undercity's three Undervators, from the Ruins of Lordaeron down to the
     // city: 3.5 s up or down, 5 s at each stop, behind a gate that opens
-    // only while the car stands there.
-    lifts_.push_back({kEasternKingdoms, 1544.24f, 240.77f, -40.78f, 55.72f, 8.0f});
-    lifts_.push_back({kEasternKingdoms, 1595.26f, 188.64f, -40.78f, 55.72f, 8.0f});
-    lifts_.push_back({kEasternKingdoms, 1596.15f, 291.80f, -40.78f, 55.72f, 8.0f});
+    // only while the car stands there - its heading from the car's middle,
+    // below and above, from where the gates ("lowerLdoor", "upperLdoor")
+    // were seen.
+    lifts_.push_back({kEasternKingdoms, 1544.24f, 240.77f, -40.78f, 55.72f, 8.0f, 3.1368f, -0.0132f});
+    lifts_.push_back({kEasternKingdoms, 1595.26f, 188.64f, -40.78f, 55.72f, 8.0f, -1.5758f, 1.5576f});
+    lifts_.push_back({kEasternKingdoms, 1596.15f, 291.80f, -40.78f, 55.72f, 8.0f, 1.5651f, -1.5829f});
 }
 
 bool LiftWatch::isLift(const GameObjectState& object)

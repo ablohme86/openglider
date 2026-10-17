@@ -550,7 +550,16 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                 onTheWay = a;
             }
 
-            if (const auto ground = onTheWay ? provider_->findWalkablePoint(*onTheWay, 2.0f, 0.0f) : std::nullopt; ground && std::fabs(ground->z - on.z) <= 3.0f)
+            // Where a gate onto the car is known, right outside it: in
+            // through it straight to the middle.
+            const auto gateOn = lift.gate(fromTop);
+            const auto outside = gateOn ? provider_->findWalkablePoint(on + Vec3{std::cos(*gateOn), std::sin(*gateOn), 0.0f} * waitOff, 1.0f, 0.0f) : std::nullopt;
+
+            if (outside && std::fabs(outside->z - on.z) <= 3.0f)
+            {
+                waitAt = *outside;
+            }
+            else if (const auto ground = onTheWay ? provider_->findWalkablePoint(*onTheWay, 2.0f, 0.0f) : std::nullopt; ground && std::fabs(ground->z - on.z) <= 3.0f)
             {
                 waitAt = *ground;
             }
@@ -561,6 +570,12 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
 
             best = LiftRide{lift, fromTop, there};
             best->waitAt = waitAt;
+
+            if (gateOn)
+            {
+                best->gateAt = on + Vec3{std::cos(*gateOn), std::sin(*gateOn), 0.0f} * (lift.floor + 2.5f);
+            }
+
             best->stepOffTo = Vec3{off.x, off.y, off.z} + offDir * (lift.floor + 3.0f);
             best->exitHeading = headingTo(off, best->stepOffTo);
 
@@ -640,6 +655,14 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             {
                 best->exitHeading = headingTo(off, there);
                 best->exitReach = farthest;
+            }
+
+            // A gate off the car known: out straight through it.
+            if (const auto gateOff = lift.gate(!fromTop))
+            {
+                const int i = static_cast<int>(std::lround(normalizeHeading(*gateOff) / kTwoPi * kSteps)) % kSteps;
+                best->exitHeading = normalizeHeading(*gateOff);
+                best->exitReach = std::max(reach[i], lift.floor + 4.0f);
             }
             bestLength = length;
         }
@@ -725,14 +748,16 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
     {
     case LiftRide::Stage::ToStop:
     {
-        const NavStatus status = moveFlat(snapshot, r.waitAt, 1.5f, true, false, false);
+        // Before a gate, right on the line through it.
+        const float close = r.gateAt ? 0.8f : 2.0f;
+        const NavStatus status = moveFlat(snapshot, r.waitAt, r.gateAt ? 0.5f : 1.5f, true, false, false);
 
         if (status == NavStatus::Unreachable)
         {
             return giveUp("no way to its stop");
         }
 
-        if (status == NavStatus::Arrived || distance2D(pos, r.waitAt) <= 2.0f)
+        if (status == NavStatus::Arrived || distance2D(pos, r.waitAt) <= close)
         {
             stop();
             stage(LiftRide::Stage::Waiting, "waiting for the car");
@@ -787,7 +812,11 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
             return NavStatus::Moving;
         }
 
-        movement_.faceWhileMoving(snapshot.player, on, 0.3f);
+        // Through the gate's middle first, then to the car's.
+        {
+            const bool beforeGate = r.gateAt && distance2D(pos, on) > distance2D(*r.gateAt, on) + 0.5f;
+            movement_.faceWhileMoving(snapshot.player, beforeGate ? *r.gateAt : on, 0.2f);
+        }
         movement_.setForward(true);
         return NavStatus::Moving;
     case LiftRide::Stage::Riding:
