@@ -423,10 +423,15 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             };
             add(provider_->findWalkablePoint(stop, Lift::kFloor + 2.0f, 0.0f));
 
-            for (int i = 0; i < 12; ++i)
+            // Out to 9 yd: above, Undercity's floor begins 8 yd off the car,
+            // the roof over it nearer its height than the floor.
+            for (const float out : {Lift::kFloor + 1.0f, Lift::kFloor + 4.0f})
             {
-                const float h = static_cast<float>(i) * kTwoPi / 12;
-                add(provider_->findWalkablePoint(stop + Vec3{std::cos(h), std::sin(h), 0.0f} * (Lift::kFloor + 1.0f), 2.0f, 0.0f));
+                for (int i = 0; i < 12; ++i)
+                {
+                    const float h = static_cast<float>(i) * kTwoPi / 12;
+                    add(provider_->findWalkablePoint(stop + Vec3{std::cos(h), std::sin(h), 0.0f} * out, 2.0f, 0.0f));
+                }
             }
 
             return grounds;
@@ -544,9 +549,16 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                 {
                     const auto g = provider_->findWalkablePoint(off + d * out, 1.0f, 0.0f);
 
+                    // Its end; before it a gap by the car is stepped over
+                    // (Undercity's floor above begins 8 yd off the car).
                     if (!g || std::fabs(g->z - off.z) > 3.0f)
                     {
-                        break;
+                        if (last || out > Lift::kFloor + 4.0f)
+                        {
+                            break;
+                        }
+
+                        continue;
                     }
 
                     reach[i] = out;

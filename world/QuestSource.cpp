@@ -83,13 +83,6 @@ bool isEventVendor(std::string_view name, std::string_view subName)
     return false;
 }
 
-// Undercity is reached by lifts the bot does not know yet. Thunder Bluff's it
-// takes (Navigator: LiftWatch).
-bool reachedByLift(std::uint32_t zone)
-{
-    return zone == 1497;
-}
-
 namespace
 {
 
@@ -1625,12 +1618,6 @@ std::vector<VendorSpot> QuestSource::vendorSpots(const GameSnapshot& s)
                 {
                     continue;
                 }
-            }
-
-            // Unless the character is up there already.
-            if (reachedByLift(canonicalZone(spawn.zone)) && canonicalZone(spawn.zone) != here)
-            {
-                continue;
             }
 
             auto position = zones_.toWorld(spawn.zone, spawn.x, spawn.y);

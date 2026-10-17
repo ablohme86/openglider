@@ -27,6 +27,7 @@ namespace og
 namespace
 {
 
+constexpr std::uint32_t kEasternKingdoms = 0;
 constexpr std::uint32_t kKalimdor = 1;
 // The same car from one sighting to the next, and the same shaft as a lift known.
 constexpr float kSameShaft = 3.0f;
@@ -58,13 +59,23 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
     // Freewind Post's, from the Needles up to the mesa.
     lifts_.push_back({kKalimdor, -5382.49f, -2489.42f, -40.53f, 89.03f});
     lifts_.push_back({kKalimdor, -5399.19f, -2504.61f, -40.28f, 89.02f});
+    // Undercity's three Undervators, from the Ruins of Lordaeron down to the
+    // city: 3.5 s up or down, 5 s at each stop, behind a gate that opens
+    // only while the car stands there.
+    lifts_.push_back({kEasternKingdoms, 1544.24f, 240.77f, -40.78f, 55.72f});
+    lifts_.push_back({kEasternKingdoms, 1595.26f, 188.64f, -40.78f, 55.72f});
+    lifts_.push_back({kEasternKingdoms, 1596.15f, 291.80f, -40.78f, 55.72f});
 }
 
 bool LiftWatch::isLift(const GameObjectState& object)
 {
     // Thunder Bluff's "Mesa Elevator", "The Great Lift", or any lift's car;
-    // never a zeppelin or a boat.
-    if (object.kind == GameObjectKind::Ship)
+    // never a zeppelin or a boat, nor the gates of Undercity's lifts
+    // ("upperLdoor"), which go up and down a few yards as the car comes.
+    std::string lower = object.name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    if (object.kind == GameObjectKind::Ship || lower.find("door") != std::string::npos)
     {
         return false;
     }
