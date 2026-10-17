@@ -124,6 +124,11 @@ struct ModernLayout
     // u32 in the object header: the quest marker over the NPC's head, see
     // modern::QuestGiver*. 0: not known.
     std::uint32_t unitQuestGiverStatus = 0;
+    // u32 in the object header beside it: what marker the NPC shows. Not 0
+    // on a flight master whose flight path the character has not learnt (the
+    // green "!": 3 at Karos Razok in The Sepulcher, 0 once learnt), and on a
+    // quest giver with its marker too. 0: not known.
+    std::uint32_t unitInteractMarker = 0;
     std::uint32_t unitBytes0 = 0;          // race, class
     std::uint32_t unitBytes1 = 0;          // its low byte the stand state: 1-6 sat (0: not known)
     std::uint32_t unitLevel = 0;           // u32

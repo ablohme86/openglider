@@ -416,6 +416,13 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
         u.questMarker = (status & modern::QuestGiverReward) ? QuestMarker::Reward : (status & modern::QuestGiverAvailable) ? QuestMarker::Available : (status & modern::QuestGiverIncomplete) ? QuestMarker::Incomplete : QuestMarker::None;
     }
 
+    // A flight master's marker with no quest's: the green "!" of a flight
+    // path not learnt.
+    if (u.isFlightMaster && L_.unitInteractMarker && L_.unitInteractMarker + 4 <= headerSize_ && u.questMarker == QuestMarker::None)
+    {
+        u.newFlightPath = field<std::uint32_t>(head.data(), L_.unitInteractMarker) != 0;
+    }
+
     // A beast is skinnable from the moment it dies, loot or not: only the dynamic flags say.
     const auto dynamicFlags = dynamicFlagsInHeader_ ? field<std::uint32_t>(head.data(), L_.unitDynamicFlags) : field<std::uint32_t>(f, L_.unitDynamicFlags - at);
     u.isLootable = u.isDead && (dynamicFlags & modern::UnitDynFlagLootable) != 0;
