@@ -289,10 +289,12 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         stageAt_ = now;
     }
 
-    // A gossip first, where it has one: the line to fly by.
+    // A gossip first, where it has one: the line to fly by - Omusa
+    // Thunderhorn's in Camp Taurajo, "I need a ride.", others' "Show me where
+    // I can fly."
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        for (const std::string_view phrase : {"fly", "Fly", "flight"})
+        for (const std::string_view phrase : {"ride", "fly", "Fly", "flight", "Flight", "travel"})
         {
             for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
             {
