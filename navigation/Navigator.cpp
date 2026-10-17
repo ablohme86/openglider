@@ -69,6 +69,12 @@ constexpr Duration kRerouteSettle{2000};
 constexpr std::size_t kReroutesBeforePassing = 4;
 constexpr Duration kReroutesWithin{20000};
 constexpr Duration kPastMobsFor{20000};
+// The way round one mob led round past another and back past the first, every
+// dozen seconds, the bot walking to and fro between them - too far apart for
+// kReroutesWithin. The same mob crossing the way again within this long, to
+// the same place, and the bot walks past them.
+constexpr Duration kCrossedWithin{180000};
+constexpr float kSameMob = 10.0f;
 
 bool walkableArcSegment(INavigationProvider& provider, const Vec3& from, const Vec3& to)
 {
@@ -587,6 +593,28 @@ void Navigator::noteReroute(const Vec3& to)
     reroutes_.clear();
     pastMobsUntil_ = now + kPastMobsFor;
     log_.info(logcat::Move, "mobs keep crossing the way to {} - walking past them for {} seconds", to, std::chrono::duration_cast<std::chrono::seconds>(kPastMobsFor).count());
+}
+
+bool Navigator::crossedBefore(const AvoidZone& zone, const Vec3& to)
+{
+    const TimePoint now = clock_.now();
+
+    if (!crossedTo_ || distance(*crossedTo_, to) > kSameMob)
+    {
+        crossed_.clear();
+        crossedTo_ = to;
+    }
+
+    std::erase_if(crossed_, [&](const auto& c) { return now - c.second > kCrossedWithin; });
+
+    if (std::any_of(crossed_.begin(), crossed_.end(), [&](const auto& c) { return distance2D(c.first, zone.center) <= kSameMob; }))
+    {
+        crossed_.clear();
+        return true;
+    }
+
+    crossed_.emplace_back(zone.center, now);
+    return false;
 }
 
 bool Navigator::preparePath(const GameSnapshot& snapshot, const Vec3& to)
@@ -1713,7 +1741,12 @@ NavStatus Navigator::moveFlat(const GameSnapshot& snapshot, const Vec3& destinat
     const bool replan = !destination_ || (clientDrift && !following && !keptAsIs) || (!provider_->usesClientGeometry() && distance(*destination_, destination) > config_.repathDistance) || (!following && !keptAsIs && distance(*destination_, destination) > 0.01f && lastLegBlocked()) || (obstacles_ && pathRevision_ != obstacles_->revision()) || pathExact_ != exact_ || pathIntoZone_ != intoZone_;
     const AvoidZone* crossing = replan ? nullptr : mobZoneOnPath(player.position);
 
-    if (crossing)
+    if (crossing && crossedBefore(*crossing, destination))
+    {
+        pastMobsUntil_ = clock_.now() + kPastMobsFor;
+        log_.info(logcat::Move, "the way round the mobs to {} keeps turning back past {} - walking past them for {} seconds", destination, crossing->name.empty() ? std::string("a mob") : crossing->name, std::chrono::duration_cast<std::chrono::seconds>(kPastMobsFor).count());
+    }
+    else if (crossing)
     {
         log_.info(logcat::Move, "the way crosses the reach of {} ({:.0f} yd round it, {:.0f} yd off) - planning round it", crossing->name.empty() ? std::string("a mob") : crossing->name, crossing->radius, distance2D(player.position, crossing->center));
     }

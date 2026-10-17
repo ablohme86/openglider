@@ -316,6 +316,11 @@ private:
     std::optional<TimePoint> headwayAt_;  // since when going without getting kHeadway from headwayFrom_
     Vec3 headwayFrom_{};
     std::vector<TimePoint> reroutes_; // new paths to the same place while mob circles were about
+    // The mobs whose reach a way to crossedTo_ crossed, and when: one
+    // crossing it again, the bot is going back and forth between ways round.
+    std::vector<std::pair<Vec3, TimePoint>> crossed_;
+    std::optional<Vec3> crossedTo_;
+    bool crossedBefore(const AvoidZone& zone, const Vec3& to);
     TimePoint lastReroute_{};
     TimePoint pastMobsUntil_{};
     bool exact_ = false;
