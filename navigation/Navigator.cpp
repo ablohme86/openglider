@@ -936,7 +936,7 @@ void Navigator::rememberJam(const Vec3& at, const Vec3& along)
         jamZones_.erase(jamZones_.begin());
     }
 
-    jamZones_.push_back({AvoidZone{center, kRadius, "what the bot got stuck on"}, now + kFor});
+    jamZones_.push_back({AvoidZone{center, kRadius, "what the bot got stuck on"}, now + kFor, at, along});
 }
 
 std::vector<AvoidZone> Navigator::avoidedZones() const
@@ -1638,7 +1638,30 @@ bool Navigator::planPath(const PlayerState& player, const Vec3& to, const std::v
         }
 
         // No way but past where the bot jammed (a doorway, a bridge): the
-        // map's way again, and the recovery moves see to the rest.
+        // map's way again, and the recovery moves see to the rest. First a
+        // narrower zone just ahead of where it stood: in Orgrimmar the wide
+        // one, at the foot of the bank's roof it ran up against, closed the
+        // ramp up to the flight tower beside it as well.
+        if ((!safe || safe->points.empty()) && !jamZones_.empty())
+        {
+            constexpr float kNarrow = 1.5f;
+            auto kept = jamZones_;
+
+            for (auto& jam : jamZones_)
+            {
+                jam.zone.center = jam.at + jam.along * (kNarrow + 0.5f);
+                jam.zone.radius = kNarrow;
+            }
+
+            safe = around(planningZones(from, to));
+            jamZones_ = kept;
+
+            if (safe && !safe->points.empty())
+            {
+                log_.info(logcat::Stuck, "a way to {} round just where the bot got stuck", to);
+            }
+        }
+
         if ((!safe || safe->points.empty()) && !jamZones_.empty())
         {
             auto kept = std::exchange(jamZones_, {});

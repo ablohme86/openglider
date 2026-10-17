@@ -359,6 +359,10 @@ private:
     {
         AvoidZone zone;
         TimePoint until;
+        // Where the bot stood stuck: a narrower zone there, just ahead of it,
+        // where the wide one closes the way beside it too.
+        Vec3 at;
+        Vec3 along;
     };
     std::vector<JamZone> jamZones_;
     void rememberJam(const Vec3& at, const Vec3& along);
