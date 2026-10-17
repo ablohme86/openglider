@@ -32,7 +32,11 @@ constexpr std::uint32_t kKalimdor = 1;
 constexpr float kSameShaft = 3.0f;
 // Up and down at least this far between two stops: a lift, not a door.
 constexpr float kRise = 10.0f;
-constexpr float kStill = 0.02f;
+// Moved this far within kSampleEvery: going. A car going covers some 1.6 yd.
+constexpr float kMoved = 0.15f;
+constexpr Duration kSampleEvery{250};
+// Not moved for this long: standing at a stop.
+constexpr Duration kStillFor{500};
 // Not seen for this long: out of sight, its car not known.
 constexpr Duration kGone{1500};
 
@@ -73,21 +77,27 @@ void LiftWatch::update(const GameSnapshot& snapshot)
         {
             // How long it has stood still is not known until it has been seen
             // coming in: a car found standing may be about to leave.
-            seen_.push_back({o.guid, *snapshot.mapId, o.position, o.position.z, o.position.z, false, TimePoint{}, now});
+            seen_.push_back({o.guid, *snapshot.mapId, o.position, o.position.z, o.position.z, o.position, now, TimePoint{}, now});
             continue;
         }
 
         Seen& s = *it;
-        const bool moving = std::fabs(o.position.z - s.at.z) > kStill || distance2D(o.position, s.at) > kStill;
-
-        if (!moving && s.moving)
-        {
-            s.stillSince = now;
-        }
-
-        s.moving = moving;
         s.at = o.position;
         s.seenAt = now;
+
+        if (distance(o.position, s.sample) > kMoved)
+        {
+            s.movedAt = now;
+            s.sample = o.position;
+            s.sampleAt = now;
+        }
+        else if (now - s.sampleAt >= kSampleEvery)
+        {
+            s.sample = o.position;
+            s.sampleAt = now;
+        }
+
+        const bool moving = s.movedAt != TimePoint{} && now - s.movedAt < kStillFor;
 
         // Where it stands still is a stop: the lowest and the highest one.
         if (!moving)
@@ -113,7 +123,9 @@ std::optional<LiftCar> LiftWatch::car(const Lift& lift) const
     {
         if (s.mapId == lift.mapId && now - s.seenAt <= kGone && std::hypot(lift.x - s.at.x, lift.y - s.at.y) <= kSameShaft)
         {
-            return LiftCar{s.at.z, s.moving, s.moving ? Duration{} : now - s.stillSince};
+            const bool moving = s.movedAt != TimePoint{} && now - s.movedAt < kStillFor;
+            // Standing since it last moved; since ever, for one never seen going.
+            return LiftCar{s.at.z, moving, moving ? Duration{} : s.movedAt == TimePoint{} ? Duration::max() : now - s.movedAt - kStillFor};
         }
     }
 

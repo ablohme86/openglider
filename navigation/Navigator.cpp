@@ -527,6 +527,9 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
     const Vec3 off = r.lift.stop(!r.fromTop);
     const auto car = lifts_.car(r.lift);
     const auto at = [&](const Vec3& stop) { return car && !car->moving && std::fabs(car->z - stop.z) <= 1.5f; };
+    // On a car the client tells where on it, a few yards from its middle -
+    // not where in the world, some way off from it.
+    const auto onCar = [&](const Vec3& p) { return std::hypot(p.x, p.y) <= Lift::kFloor + 3.0f && std::fabs(p.z) <= 5.0f && distance2D(p, on) > 100.0f; };
     const auto giveUp = [&](std::string_view why)
     {
         log_.warn(logcat::Move, "giving up the lift at ({:.0f}, {:.0f}): {}", r.lift.x, r.lift.y, why);
@@ -575,9 +578,26 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
 
         return NavStatus::Moving;
     case LiftRide::Stage::Boarding:
-        // Gone before the bot was on: back to waiting for the next.
-        if (!at(on) && distance2D(pos, on) > Lift::kFloor - 1.0f)
+        // On the car: the client tells where on it, not where in the world.
+        if (onCar(pos))
         {
+            stop();
+            stage(LiftRide::Stage::Riding, "on the car - riding");
+            return NavStatus::Moving;
+        }
+
+        if (!at(on))
+        {
+            // Gone with the bot on its floor: riding.
+            if (car && car->moving && distance2D(pos, on) <= Lift::kFloor && std::fabs(pos.z - on.z) <= 3.0f)
+            {
+                stop();
+                stage(LiftRide::Stage::Riding, "on the car as it left - riding");
+                return NavStatus::Moving;
+            }
+
+            // Gone without it: never into the shaft without the car in it - a
+            // pit lies under one of Thunder Bluff's.
             stop();
             stage(LiftRide::Stage::ToStop, "the car left before the bot was on - waiting for the next");
             return NavStatus::Moving;
@@ -596,6 +616,14 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
     case LiftRide::Stage::Riding:
         movement_.stop();
 
+        // Where the bot got on, on the ground beside the shaft, while the car
+        // is gone: it was not on it.
+        if (!onCar(pos) && distance2D(pos, on) > Lift::kFloor + 1.0f && std::fabs(pos.z - on.z) <= 3.0f && car && !at(on))
+        {
+            stage(LiftRide::Stage::ToStop, "not on the car - waiting for the next");
+            return NavStatus::Moving;
+        }
+
         if (at(off))
         {
             stage(LiftRide::Stage::Leaving, "at the other stop - stepping off");
@@ -609,19 +637,34 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
     case LiftRide::Stage::Leaving:
     {
         // Facing the way off from the car's floor, forward until the client
-        // tells where the bot is again.
-        PlayerState onCar = snapshot.player;
-        onCar.position = off;
-        movement_.faceWhileMoving(onCar, r.stepOffTo, 0.3f);
+        // tells where the bot is again: off the car, on the other level.
+        PlayerState onTheCar = snapshot.player;
+        onTheCar.position = off;
+        movement_.faceWhileMoving(onTheCar, r.stepOffTo, 0.3f);
         movement_.setForward(true);
+        const bool offIt = !onCar(pos) && std::fabs(pos.z - off.z) <= 3.0f && distance2D(pos, off) >= Lift::kFloor - 1.0f;
 
-        if ((std::fabs(pos.z - off.z) <= 3.0f && distance2D(pos, off) >= Lift::kFloor) || now - r.since > kStepOffLongest)
+        if (offIt)
         {
             log_.info(logcat::Move, "off the lift at ({:.0f}, {:.0f}) - on to {}", r.lift.x, r.lift.y, r.to);
             ride_.reset();
+            movement_.setForward(false);
             clearPath();
             stuck_.reset();
             return std::nullopt;
+        }
+
+        if (now - r.since > kStepOffLongest)
+        {
+            // Still where it got on: it never went with the car.
+            if (!onCar(pos) && std::fabs(pos.z - on.z) <= 3.0f)
+            {
+                movement_.setForward(false);
+                stage(LiftRide::Stage::ToStop, "still at the stop it got on at - waiting for the next");
+                return NavStatus::Moving;
+            }
+
+            return giveUp("not off the car at the other stop");
         }
 
         return NavStatus::Moving;

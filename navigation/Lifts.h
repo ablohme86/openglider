@@ -83,8 +83,12 @@ private:
         Vec3 at;
         float low = 0.0f;
         float high = 0.0f;
-        bool moving = false;
-        TimePoint stillSince{};
+        // Where it was a moment ago: moving is judged over a few tenths of a
+        // second - from one tick to the next a car standing at a stop wobbled
+        // by as much as one starting off moves.
+        Vec3 sample;
+        TimePoint sampleAt{};
+        TimePoint movedAt{};
         TimePoint seenAt{};
     };
 
