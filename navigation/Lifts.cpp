@@ -62,8 +62,13 @@ LiftWatch::LiftWatch(const IClock& clock) : clock_(clock)
 
 bool LiftWatch::isLift(const GameObjectState& object)
 {
-    // Thunder Bluff's "Mesa Elevator", "The Great Lift", or any transport -
-    // a boat or a zeppelin too, which is never learnt for one: it goes about.
+    // Thunder Bluff's "Mesa Elevator", "The Great Lift", or any lift's car;
+    // never a zeppelin or a boat.
+    if (object.kind == GameObjectKind::Ship)
+    {
+        return false;
+    }
+
     return object.kind == GameObjectKind::Transport || object.name.find("Elevator") != std::string::npos || object.name.find("Lift") != std::string::npos;
 }
 

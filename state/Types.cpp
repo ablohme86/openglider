@@ -252,6 +252,8 @@ std::string_view toString(GameObjectKind k)
         return "FishingHole";
     case GameObjectKind::Transport:
         return "Transport";
+    case GameObjectKind::Ship:
+        return "Ship";
     case GameObjectKind::Unknown:
         break;
     }
