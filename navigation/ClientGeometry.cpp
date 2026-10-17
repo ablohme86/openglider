@@ -1128,9 +1128,17 @@ CollisionGeometry parseWorldModelCollision(Bytes root, const ClientFileReader& r
             throw std::runtime_error("invalid WMO group header");
         }
 
-        const auto subs = group.subspan(68), vertices = chunk(subs, "MOVT"), indices = chunk(subs, "MOVI");
+        // Newer groups give their triangles' corners as 32-bit indices
+        // (MOVX) and their materials 4 bytes each (MPY2) - one such house in
+        // Tirisfall, unread, took its whole map tile with it, and Deathknell
+        // had no way out.
+        const auto subs = group.subspan(68), vertices = chunk(subs, "MOVT");
+        const auto shortIndices = chunk(subs, "MOVI"), longIndices = chunk(subs, "MOVX");
+        const bool wide = shortIndices.empty() && !longIndices.empty();
+        const auto indices = wide ? longIndices : shortIndices;
+        const std::size_t corner = wide ? 4 : 2;
 
-        if (vertices.size() % 12 || indices.size() % 6)
+        if (vertices.size() % 12 || indices.size() % (corner * 3))
         {
             throw std::runtime_error("invalid WMO geometry arrays");
         }
@@ -1143,8 +1151,11 @@ CollisionGeometry parseWorldModelCollision(Bytes root, const ClientFileReader& r
         }
 
         const auto collisionRefs = chunk(subs, "MOBR");
-        const auto materials = chunk(subs, "MOPY");
-        std::vector<bool> collidable(indices.size() / 6, false);
+        const auto oldMaterials = chunk(subs, "MOPY"), newMaterials = chunk(subs, "MPY2");
+        const bool newMaterial = oldMaterials.empty() && !newMaterials.empty();
+        const auto materials = newMaterial ? newMaterials : oldMaterials;
+        const std::size_t material = newMaterial ? 4 : 2;
+        std::vector<bool> collidable(indices.size() / (corner * 3), false);
 
         if (!collisionRefs.empty())
         {
@@ -1169,24 +1180,28 @@ CollisionGeometry parseWorldModelCollision(Bytes root, const ClientFileReader& r
         {
             for (std::size_t t = 0; t < collidable.size(); ++t)
             {
-                if (materials.size() < (t + 1) * 2)
+                // None said: a wall all the same, rather than the tile lost.
+                if (materials.size() < (t + 1) * material)
                 {
-                    throw std::runtime_error("missing WMO triangle materials");
+                    collidable[t] = true;
+                    continue;
                 }
 
-                const auto f = materials[t * 2];
-                collidable[t] = (f & 0x08) || ((f & 0x20) && !(f & 0x04)) || materials[t * 2 + 1] == 0xff;
+                const auto f = materials[t * material];
+                const bool noMaterial = newMaterial ? get<std::uint16_t>(materials, t * material + 2) == 0xffff : materials[t * material + 1] == 0xff;
+                collidable[t] = (f & 0x08) || ((f & 0x20) && !(f & 0x04)) || noMaterial;
             }
         }
 
-        for (std::size_t j = 0; j < indices.size(); j += 6)
+        for (std::size_t j = 0; j < indices.size(); j += corner * 3)
         {
-            if (!collidable[j / 6])
+            if (!collidable[j / (corner * 3)])
             {
                 continue;
             }
 
-            int a = get<std::uint16_t>(indices, j), b = get<std::uint16_t>(indices, j + 2), c = get<std::uint16_t>(indices, j + 4);
+            const auto at = [&](std::size_t k) { return wide ? static_cast<int>(get<std::uint32_t>(indices, k)) : static_cast<int>(get<std::uint16_t>(indices, k)); };
+            int a = at(j), b = at(j + corner), c = at(j + 2 * corner);
 
             if (a >= static_cast<int>(g.vertices.size()) || b >= static_cast<int>(g.vertices.size()) || c >= static_cast<int>(g.vertices.size()))
             {
