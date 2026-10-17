@@ -249,6 +249,8 @@ void BotEngine::tick(const SnapshotObserver& beforeBehaviors)
         beforeBehaviors(*snapshot);
     }
 
+    ctx_.ships.update(*snapshot);
+
     // Flying a flight path: the game flies the character; nothing is done
     // until it lands.
     if (snapshot->player.isOnTaxi != onTaxi_)

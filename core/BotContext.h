@@ -33,6 +33,7 @@
 #include "og/core/StrongMobWatch.h"
 #include "og/input/IInputBackend.h"
 #include "og/navigation/Navigator.h"
+#include "og/navigation/Ships.h"
 #include "og/navigation/WaypointRoute.h"
 #include "og/profiles/GliderProfile.h"
 #include "og/targets/TargetSelector.h"
@@ -337,6 +338,8 @@ struct BotContext
     };
     Breath breath;
     IQuestSource* questSource = nullptr; // Questing's data, where there is any
+    // The zeppelins and boats in sight: parked, leaving or coming in.
+    ShipWatch ships;
     // The flight paths, from the client's tables, where they could be read.
     std::shared_ptr<const TaxiNetwork> taxiNetwork;
     const TaxiNetwork* network() const
