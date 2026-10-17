@@ -120,8 +120,8 @@ struct Grid
 // Refine tiles with overlapping floors: half-yard cells lose narrow stairs
 // such as Bliztik's. Keep the same half-yard character radius and tile border.
 // Separate fine caches prevent reuse of the old disconnected stair tiles.
-constexpr Grid kFine{kTile, 0.5f, 0.2f, 8, 5, 1, 5, 0.2f, "fine-v5"};
-constexpr Grid kIndoor{kTile, 0.25f, 0.2f, 8, 5, 2, 10, 0.2f, "fine-v5"};
+constexpr Grid kFine{kTile, 0.5f, 0.2f, 8, 5, 1, 5, 0.2f, "fine-v6"};
+constexpr Grid kIndoor{kTile, 0.25f, 0.2f, 8, 5, 2, 10, 0.2f, "fine-v6"};
 // Two-yard samples on a walkable slope can differ by almost three yards.
 // Keeping the fine mesh's one-yard step limit here disconnected ordinary
 // hills (including the approach to Lakeshire) and lost the whole-zone route.
@@ -208,6 +208,15 @@ bool hasStackedFloors(const CollisionGeometry& geometry, float x0, float y0)
 constexpr float kSteepSlope = 35;
 constexpr unsigned char kSteepArea = 1; // area id while building; 1 in the mesh
 constexpr float kSteepCost = 8;
+// Under a roof lower than kHeadroom: the map has a character fit under 1.6
+// yards (for the tight stairs of towers), and a tauren does not - from the
+// inn of Orgrimmar to its flight tower the way ran under the low eaves of the
+// bank, some 2.8 yd up, and the tauren stuck against them, a ramp up beside
+// them. For a tall character such ground costs kLowCost: kept to where it is
+// the only way.
+constexpr float kHeadroom = 3.0f;
+constexpr unsigned char kLowArea = 5; // area id while building; 5 in the mesh
+constexpr float kLowCost = 8;
 // A hillside, kHillSlope up to kSteepSlope, costs kHillCost: walked where it
 // is the way, not climbed for a shorter line - the way from Crystal Lake to
 // Milly's farm went over the ridge north of it, 60 yards up, beside the trail
@@ -347,7 +356,7 @@ private:
     std::vector<dtPolyRef> closed_;
 };
 
-void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater)
+void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater, bool tall = false)
 {
     const bool far = span > kRoadNearGoal;
     const float ground = far && roads ? 1 / (span > kLongRoadFrom ? kLongRoadCost : kRoadCost) : 1.0f;
@@ -356,6 +365,7 @@ void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater)
     filter.setAreaCost(2, far && roads ? 1.0f : ground);
     filter.setAreaCost(3, avoidWater ? kWaterCost * ground : ground);
     filter.setAreaCost(4, kHillCost * ground);
+    filter.setAreaCost(5, tall ? kLowCost * ground : ground);
 }
 
 // The road's edge, kRoadMargin wide, is left as open ground: a way along the
@@ -676,6 +686,24 @@ struct ClientNavigationProvider::Impl
 
         shrinkArea(*chf, kRoadArea, static_cast<int>(kRoadMargin / grid.cs));
 
+        // Ground with a roof low over it: the space up to the next surface
+        // above, in cells of ch. Not on the coarse map, whose two-yard cells
+        // it broke into slivers its detail could not be built for.
+        const int headroom = static_cast<int>(std::ceil(kHeadroom / grid.ch));
+
+        for (int c = 0; grid.cs < 1.0f && c < chf->width * chf->height; ++c)
+        {
+            const rcCompactCell& cell = chf->cells[c];
+
+            for (int s = static_cast<int>(cell.index), end = static_cast<int>(cell.index + cell.count); s < end; ++s)
+            {
+                if (chf->areas[s] != RC_NULL_AREA && chf->areas[s] != kSteepArea && chf->spans[s].h < headroom)
+                {
+                    chf->areas[s] = kLowArea;
+                }
+            }
+        }
+
         if (!rcBuildDistanceField(&context, *chf) || !rcBuildRegions(&context, *chf, cfg.borderSize, cfg.minRegionArea, cfg.mergeRegionArea) || !rcBuildContours(&context, *chf, cfg.maxSimplificationError, cfg.maxEdgeLen, *contours) || !rcBuildPolyMesh(&context, *contours, cfg.maxVertsPerPoly, *polys) || !rcBuildPolyMeshDetail(&context, *polys, *chf, cfg.detailSampleDist, cfg.detailSampleMaxError, *detail))
         {
             throw std::runtime_error("cannot build client walking surfaces");
@@ -691,7 +719,7 @@ struct ClientNavigationProvider::Impl
         for (int i = 0; i < polys->npolys; ++i)
         {
             polys->flags[i] = 1;
-            polys->areas[i] = polys->areas[i] == kSteepArea ? 1 : polys->areas[i] == kRoadArea ? 2 : polys->areas[i] == kWaterArea ? 3 : polys->areas[i] == kHillArea ? 4 : 0;
+            polys->areas[i] = polys->areas[i] == kSteepArea ? 1 : polys->areas[i] == kRoadArea ? 2 : polys->areas[i] == kWaterArea ? 3 : polys->areas[i] == kHillArea ? 4 : polys->areas[i] == kLowArea ? 5 : 0;
         }
 
         dtNavMeshCreateParams p{};
@@ -1270,7 +1298,7 @@ std::optional<Path> ClientNavigationProvider::findPath(const Vec3& from, const V
             dtPolyRef first = 0, last = 0;
             dtQueryFilter filter;
             filter.setIncludeFlags(1);
-            setCosts(filter, distance2D(from, to), useRoads_, avoidWater_);
+            setCosts(filter, distance2D(from, to), useRoads_, avoidWater_, tall_);
             // What the caller asked this way to keep out of (setAvoiding).
             std::vector<Closed::Circle> circles;
 

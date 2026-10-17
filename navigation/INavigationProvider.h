@@ -79,6 +79,12 @@ public:
     {
     }
 
+    // A tall character (a tauren): under a low roof only where there is no
+    // way round it.
+    virtual void setTall(bool)
+    {
+    }
+
     // A shortcut must stay on connected walking surfaces, including its end floor.
     virtual bool canWalkStraight(const Vec3&, const Vec3&) const
     {

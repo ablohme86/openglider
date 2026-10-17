@@ -331,6 +331,8 @@ void BotInstance::tick()
     navigation->setUseRoads(config_.useRoads && !ghost && !(!config_.quest.enabled && engine_.currentName() == "Navigation"));
     // Over a bridge rather than through the water - but not on a corpse run.
     navigation->setAvoidWater(!ghost);
+    // A tauren (race 6) is too tall for the low eaves others pass under.
+    navigation->setTall(seen && seen->player.race == 6);
     navigator_.setSway(config_.humanizer.enabled ? config_.humanizer.sway : 0.0f);
 
     if (config_.usePathfinding && engine_.state() != EngineState::Paused && !pathfindingOrigin_)
