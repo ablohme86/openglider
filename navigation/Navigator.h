@@ -153,6 +153,11 @@ public:
     {
         return ride_ ? std::optional<float>{ride_->exitHeading} : std::nullopt;
     }
+    // Where the car is waited for, on a lift trip.
+    std::optional<Vec3> liftWaitAt() const
+    {
+        return ride_ ? std::optional<Vec3>{ride_->waitAt} : std::nullopt;
+    }
 
     void setProvider(INavigationProvider& provider)
     {

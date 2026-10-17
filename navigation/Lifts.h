@@ -40,8 +40,11 @@ struct Lift
     float y = 0.0f;
     float bottom = 0.0f;
     float top = 0.0f;
-    // How far from the middle the car's floor holds a character.
+    // How far from the middle the car's floor holds a character: 5 yd in
+    // Thunder Bluff, 8 in Undercity, whose cars stand behind a gate 9-10 yd
+    // off their middle.
     static constexpr float kFloor = 5.0f;
+    float floor = kFloor;
 
     Vec3 stop(bool upper) const
     {

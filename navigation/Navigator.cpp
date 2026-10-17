@@ -421,11 +421,11 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                     grounds.push_back(*g);
                 }
             };
-            add(provider_->findWalkablePoint(stop, Lift::kFloor + 2.0f, 0.0f));
+            add(provider_->findWalkablePoint(stop, lift.floor + 2.0f, 0.0f));
 
-            // Out to 9 yd: above, Undercity's floor begins 8 yd off the car,
-            // the roof over it nearer its height than the floor.
-            for (const float out : {Lift::kFloor + 1.0f, Lift::kFloor + 4.0f})
+            // Out to 4 yd past the car's floor: above, Undercity's floor begins
+            // 8 yd off the car, the roof over it nearer its height than the floor.
+            for (const float out : {lift.floor + 1.0f, lift.floor + 4.0f})
             {
                 for (int i = 0; i < 12; ++i)
                 {
@@ -521,14 +521,47 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             const Vec3 offDir = outward(off, *offGround, there);
             Vec3 waitAt = *onGround;
 
-            if (const auto beside = provider_->findWalkablePoint(on + waitDir * (Lift::kFloor + 3.0f), 3.0f, 0.0f); beside && std::fabs(beside->z - on.z) <= 3.0f && reaches(provider_->findPath(from, *beside), *beside))
+            // Waited for where the way to the stop comes onto the car's floor,
+            // a few yards short of it: in Undercity through a gate on one side
+            // of the car, shut while the car is away. Taken towards where the
+            // bot was instead, it waited on the far side of the floor, walked
+            // across it to there, and the car took it up against the wall.
+            // Undercity's gates stand 10-11 yd off the middle: 2 yd past them.
+            const float waitOff = lift.floor + 5.0f;
+            std::vector<Vec3> way{from};
+            way.insert(way.end(), toLift->points.begin(), toLift->points.end());
+            std::optional<Vec3> onTheWay;
+
+            for (std::size_t i = way.size() - 1; i > 0 && !onTheWay; --i)
+            {
+                Vec3 a = way[i - 1], b = way[i];
+
+                if (distance2D(a, on) < waitOff || distance2D(b, on) >= waitOff)
+                {
+                    continue;
+                }
+
+                for (int step = 0; step < 20; ++step)
+                {
+                    const Vec3 mid = (a + b) * 0.5f;
+                    (distance2D(mid, on) >= waitOff ? a : b) = mid;
+                }
+
+                onTheWay = a;
+            }
+
+            if (const auto ground = onTheWay ? provider_->findWalkablePoint(*onTheWay, 2.0f, 0.0f) : std::nullopt; ground && std::fabs(ground->z - on.z) <= 3.0f)
+            {
+                waitAt = *ground;
+            }
+            else if (const auto beside = provider_->findWalkablePoint(on + waitDir * waitOff, 3.0f, 0.0f); beside && std::fabs(beside->z - on.z) <= 3.0f && reaches(provider_->findPath(from, *beside), *beside))
             {
                 waitAt = *beside;
             }
 
             best = LiftRide{lift, fromTop, there};
             best->waitAt = waitAt;
-            best->stepOffTo = Vec3{off.x, off.y, off.z} + offDir * (Lift::kFloor + 3.0f);
+            best->stepOffTo = Vec3{off.x, off.y, off.z} + offDir * (lift.floor + 3.0f);
             best->exitHeading = headingTo(off, best->stepOffTo);
 
             // The way off: round the other stop every 5 degrees, how far out
@@ -545,7 +578,7 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                 const Vec3 d{std::cos(h), std::sin(h), 0.0f};
                 std::optional<Vec3> last;
 
-                for (float out = Lift::kFloor + 1.0f; out <= 16.0f; out += 2.0f)
+                for (float out = lift.floor + 1.0f; out <= 16.0f; out += 2.0f)
                 {
                     const auto g = provider_->findWalkablePoint(off + d * out, 1.0f, 0.0f);
 
@@ -553,7 +586,7 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
                     // (Undercity's floor above begins 8 yd off the car).
                     if (!g || std::fabs(g->z - off.z) > 3.0f)
                     {
-                        if (last || out > Lift::kFloor + 4.0f)
+                        if (last || out > lift.floor + 4.0f)
                         {
                             break;
                         }
@@ -648,8 +681,8 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
 
         if (auto ride = planLift(snapshot, destination))
         {
-            log_.info(logcat::Move, "the way to {} goes by the lift at ({:.0f}, {:.0f}), {} - to its stop at {}, off it heading {:.0f} degrees, ground {:.0f} yd out", destination, ride->lift.x, ride->lift.y, ride->fromTop ? "down" : "up", ride->lift.stop(ride->fromTop),
-                      ride->exitHeading * 180.0f / kPi, ride->exitReach);
+            log_.info(logcat::Move, "the way to {} goes by the lift at ({:.0f}, {:.0f}), {} - to its stop at {}, waiting at {}, off it heading {:.0f} degrees, ground {:.0f} yd out", destination, ride->lift.x, ride->lift.y, ride->fromTop ? "down" : "up",
+                      ride->lift.stop(ride->fromTop), ride->waitAt, ride->exitHeading * 180.0f / kPi, ride->exitReach);
             liftTo_ = std::pair{destination, ride->to};
             liftCheckedFor_ = ride->to;
             destination = ride->to;
@@ -673,7 +706,7 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
     const auto at = [&](const Vec3& stop) { return car && !car->moving && std::fabs(car->z - stop.z) <= 1.5f; };
     // On a car the client tells where on it, a few yards from its middle -
     // not where in the world, some way off from it.
-    const auto onCar = [&](const Vec3& p) { return std::hypot(p.x, p.y) <= Lift::kFloor + 3.0f && std::fabs(p.z) <= 5.0f && distance2D(p, on) > 100.0f; };
+    const auto onCar = [&](const Vec3& p) { return std::hypot(p.x, p.y) <= r.lift.floor + 3.0f && std::fabs(p.z) <= 5.0f && distance2D(p, on) > 100.0f; };
     const auto giveUp = [&](std::string_view why)
     {
         log_.warn(logcat::Move, "giving up the lift at ({:.0f}, {:.0f}): {}", r.lift.x, r.lift.y, why);
@@ -733,7 +766,7 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         if (!at(on))
         {
             // Gone with the bot on its floor: riding.
-            if (car && car->moving && distance2D(pos, on) <= Lift::kFloor && std::fabs(pos.z - on.z) <= 3.0f)
+            if (car && car->moving && distance2D(pos, on) <= r.lift.floor && std::fabs(pos.z - on.z) <= 3.0f)
             {
                 stop();
                 stage(LiftRide::Stage::Riding, "on the car as it left - riding");
@@ -763,7 +796,7 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
 
         // Where the bot got on, on the ground beside the shaft, while the car
         // is gone: it was not on it.
-        if (!onCar(pos) && distance2D(pos, on) > Lift::kFloor + 1.0f && std::fabs(pos.z - on.z) <= 3.0f && car && !at(on))
+        if (!onCar(pos) && distance2D(pos, on) > r.lift.floor + 1.0f && std::fabs(pos.z - on.z) <= 3.0f && car && !at(on))
         {
             stage(LiftRide::Stage::ToStop, "not on the car - waiting for the next");
             return NavStatus::Moving;
@@ -802,7 +835,7 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         // Straight along the way off, the heading kept whatever the bot's
         // place on the car is taken for, until well out on the map.
         const Vec3 along{std::cos(r.exitHeading), std::sin(r.exitHeading), 0.0f};
-        const float wellOff = std::max(Lift::kFloor + 3.0f, std::min(r.exitReach - 1.0f, 12.0f));
+        const float wellOff = std::max(r.lift.floor + 3.0f, std::min(r.exitReach - 1.0f, 12.0f));
 
         if (told && distance2D(pos, off) >= wellOff)
         {
