@@ -247,8 +247,10 @@ std::optional<TaxiPlan> TaxiNetwork::plan(std::uint32_t mapId, const Vec3& at, c
         }
     }
 
-    // Worth it: a quarter of the time saved, and a minute at least.
-    if (best && best->seconds < walkSeconds * 0.75f && walkSeconds - best->seconds >= 60.0f)
+    // Worth it: a minute saved at least, and a tenth of the time. From
+    // Orgrimmar to Ratchet by the Crossroads saved two minutes of eight - a
+    // quarter asked for, it walked.
+    if (best && best->seconds < walkSeconds * 0.9f && walkSeconds - best->seconds >= 60.0f)
     {
         return best;
     }

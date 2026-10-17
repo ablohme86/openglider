@@ -91,8 +91,8 @@ public:
     // points `known`: walking is guessed at `walkFactor` times the straight
     // line, at `runSpeed`; flying at kFlightSpeed with kFlightOverhead for
     // getting there, talking, rising and landing. A plan only where it saves
-    // a fair part of the way and at least a minute, and `money` (copper; -1
-    // not known) pays for it.
+    // a minute and a tenth of the time at least, and `money` (copper; -1 not
+    // known) pays for it.
     static constexpr float kFlightSpeed = 30.0f;
     static constexpr float kFlightOverhead = 30.0f;
     std::optional<TaxiPlan> plan(std::uint32_t mapId, const Vec3& at, const Vec3& destination, const std::vector<std::uint32_t>& known, std::int64_t money, float runSpeed = 7.0f, float walkFactor = 1.3f) const;
