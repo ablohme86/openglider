@@ -805,7 +805,9 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
             return NavStatus::Moving;
         }
 
-        if (distance2D(pos, on) <= 1.5f)
+        // In the middle - or, through a gate, past it: in Undercity it walked
+        // on across the car up to the gate on the far side.
+        if (distance2D(pos, on) <= 1.5f || (r.gateAt && (pos.x - on.x) * (r.gateAt->x - on.x) + (pos.y - on.y) * (r.gateAt->y - on.y) <= 0.0f))
         {
             stop();
             stage(LiftRide::Stage::Riding, "on the car - riding");
