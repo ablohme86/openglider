@@ -477,8 +477,10 @@ float TargetSelector::scoreTarget(const UnitState& u, const GameSnapshot& s) con
         score += 50.0f;
     }
 
-    // Closer is better: up to +40 at distance 0.
-    score += std::max(0.0f, 40.0f - dist);
+    // Closer is better: +40 at distance 0, and farther off on down past 40 yd.
+    // Cut off at 0 there, a mob up the hill counted as near as one beside the
+    // bot on the way to it, and one with fewer of its own about won.
+    score += 40.0f - dist;
 
     const int levelDiff = u.level - s.player.level;
 
