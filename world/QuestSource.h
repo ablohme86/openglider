@@ -40,6 +40,9 @@ namespace og
 // it sells and buys only for those exalted with its race, so a bags-full trip
 // to one ends at a window that never opens. Never chosen to sell or repair at.
 bool isMountVendor(std::string_view subName);
+// A vendor of a holiday or of the Darkmoon Faire ("Lunar Festival Vendor",
+// "Hallow's End Treats"): in the data all year, there only while it lasts.
+bool isEventVendor(std::string_view name, std::string_view subName);
 // The class an NPC trains by its title: "Paladin" of "Paladin Trainer". Not a
 // "Demon Trainer", "Pet Trainer" or a profession's ("Junior Mining Trainer").
 std::optional<std::string> trainerClass(std::string_view subName);
@@ -107,9 +110,12 @@ public:
     // "The Great Outdoors" and that to "Camping 101: Cooking" (and the other
     // professions). Talking to trainers the bot has no use for.
     bool isCampingQuest(std::uint32_t questId) const;
+    // A quest the bot cannot do, by its name: "Kyle's Gone Missing!" has Kyle
+    // the dog found and fed a treat as he runs about Bloodhoof Village.
+    bool isQuestTheBotCannotDo(std::uint32_t questId) const;
     bool isAutoIgnored(std::uint32_t questId) const override
     {
-        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId);
+        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId) || isQuestTheBotCannotDo(questId);
     }
     void setEliteEntries(std::shared_ptr<const std::unordered_set<std::uint32_t>> entries) override
     {

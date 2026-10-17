@@ -430,6 +430,9 @@ private:
     bool pullFinished_ = false;
     bool pullActionExecuted_ = false;
     TimePoint pullActionAt_{}; // when the last pull rule went off
+    // The target that fled, until it is dead or gone: fought first again
+    // once it is back, before the mob fought meanwhile.
+    Guid fled_ = 0;
     Guid tappedGuid_ = 0;      // the target seen tagged by another player, since
     TimePoint tappedSince_{};
     std::optional<TimePoint> autoRepeatStartedAt_;
@@ -477,7 +480,9 @@ private:
     bool closingIn_ = false;
     // Stepping away, mid-fight, from a mob too strong to fight that stands or
     // comes within reach of noticing us.
-    bool dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
+    // adds: away from a mob that would join the fight too, not only from one
+    // too strong to fight.
+    bool dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, bool adds = true);
     void stopDodging(BotContext& ctx);
     bool dodging_ = false;
     int dodgeStrafe_ = 0; // 1 left, -1 right
@@ -965,6 +970,45 @@ private:
 // the character's class (by the quest data), through its gossip line to the
 // trainer window, and every spell it lists learned that the money allows -
 // a row chosen, Train clicked, and the money seen to go down.
+// A flight master in sight whose flight path the character has not learnt
+// (the green "!" over its head): walked to and talked to, which learns it,
+// and the flight map that opens closed again.
+class FlightMasterBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "Learn Flight Path";
+    }
+
+    int priority() const override
+    {
+        return priority::LearnFlightPath;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+private:
+    BehaviorStatus finish(BotContext& ctx, const std::string& reason, bool failed);
+
+    Guid npc_ = 0;
+    std::string npcName_;
+    TimePoint started_{}, talkedAt_{};
+    int talks_ = 0;
+    bool gossipChosen_ = false;
+    // Without Lua (1.60.1) talked to as a trainer is: a right-click on it
+    // under the mouse, the interact key where the mouse finds nothing, and
+    // right up to it after a talk that came to nothing.
+    int rightClicks_ = 0;
+    bool mouseTried_ = false;
+    bool closeIn_ = false;
+    // Flight masters tried and given up on, not again until then.
+    std::map<Guid, TimePoint> notBefore_;
+};
+
 class TrainerBehavior final : public IBotBehavior
 {
 public:

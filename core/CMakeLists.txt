@@ -31,6 +31,8 @@ og_add_module(core
         behaviors/InventoryQuestBehavior.cpp
         behaviors/QuestHandInBehavior.cpp
         behaviors/TrainerBehavior.cpp
+        behaviors/FlightMasterBehavior.cpp
+        TaxiTrip.cpp
         behaviors/AutoEquipBehavior.cpp
         behaviors/DeathBehavior.cpp
         behaviors/ResurrectEscapeBehavior.cpp
@@ -42,4 +44,5 @@ og_add_module(core
         og_navigation
         og_targets
         og_profiles
-        og_combat)
+        og_combat
+        og_world)

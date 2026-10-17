@@ -253,15 +253,44 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
 
     if (!attackers.empty())
     {
+        // One fighting us, not running from us: while the target flees, a mob
+        // hitting us is fought rather than the runner chased.
+        const auto fighting = [&](const UnitState* u) { return u && u->isAlive() && s.isAttacker(*u) && !u->isFleeing; };
+
+        // The one that fled is back: finished first, then the rest.
+        if (const UnitState* back = s.findUnit(fled_); fighting(back))
+        {
+            return back->guid;
+        }
+
         // Keep hitting what we are hitting, then what we planned to hit, then the best attacker.
-        if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t))
+        if (const UnitState* t = s.target(); fighting(t))
         {
             return t->guid;
         }
 
-        if (const UnitState* e = s.findUnit(ctx.combat.engaged); e && e->isAlive() && s.isAttacker(*e))
+        if (const UnitState* e = s.findUnit(ctx.combat.engaged); fighting(e))
         {
             return e->guid;
+        }
+
+        if (const UnitState* best = ctx.targets.selectAttacker(s); fighting(best))
+        {
+            return best->guid;
+        }
+
+        for (const UnitState* u : attackers)
+        {
+            if (fighting(u))
+            {
+                return u->guid;
+            }
+        }
+
+        // Only the runner: after it.
+        if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t))
+        {
+            return t->guid;
         }
 
         if (const UnitState* best = ctx.targets.selectAttacker(s))
@@ -285,6 +314,15 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
 
 BehaviorStatus CombatBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 {
+    if (const UnitState* e = s.findUnit(ctx.combat.engaged); e && e->isAlive() && e->isFleeing)
+    {
+        fled_ = e->guid;
+    }
+    else if (const UnitState* f = s.findUnit(fled_); !f || !f->isAlive())
+    {
+        fled_ = 0;
+    }
+
     const Guid desired = chooseTarget(s, ctx);
     const UnitState* unit = s.findUnit(desired);
 
@@ -432,8 +470,11 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
     }
 
     // We cannot select a specific GUID with keys; if the game already has a
-    // live attacker targeted, fight that one instead.
-    if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t))
+    // live attacker targeted, fight that one instead - not one running from
+    // us, which chooseTarget left for one hitting us: kept, the bot stood by
+    // while that one hit it until the runner came back. Nor when the runner
+    // is back: it is Tabbed to, and finished first.
+    if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t) && !t->isFleeing && unit.guid != fled_)
     {
         ctx.combat.engaged = t->guid;
         return BehaviorStatus::Running;
@@ -913,7 +954,9 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
 
     // Away from a mob too strong to fight, or one that would join the fight,
     // before anything else: the mob being fought comes along. The rotation waits - a cast would stop the step.
-    if (dodgeMobs(unit, s, ctx))
+    // After a runner, only from one too strong: stepping away from an add
+    // and running on after it again dragged the bot back and forth.
+    if (dodgeMobs(unit, s, ctx, !unit.isFleeing))
     {
         return BehaviorStatus::Running;
     }
@@ -1239,7 +1282,7 @@ void CombatBehavior::stopDodging(BotContext& ctx)
     ctx.movement.setForward(false);
 }
 
-bool CombatBehavior::dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx)
+bool CombatBehavior::dodgeMobs(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, bool adds)
 {
     const TimePoint now = ctx.now();
     const PlayerState& p = s.player;
@@ -1252,7 +1295,7 @@ bool CombatBehavior::dodgeMobs(const UnitState& unit, const GameSnapshot& s, Bot
     // Add Avoidance: the same for any other hostile mob that would notice the
     // character and join the fight - one standing that near, or walking to
     // where it will.
-    if (!threat && ctx.config.addAvoidance)
+    if (!threat && adds && ctx.config.addAvoidance)
     {
         threat = ctx.nearMobs.threatTo(p.position, ctx.config.addAvoidanceMargin + (dodging_ ? kDodgeClear : 0.0f), unit.guid);
 

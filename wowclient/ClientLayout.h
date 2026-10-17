@@ -240,6 +240,7 @@ inline constexpr std::uint32_t UnitFlagImmuneToPc = 0x00000100; // 1.x: "not att
 inline constexpr std::uint32_t UnitFlagInCombat = 0x00080000;
 inline constexpr std::uint32_t UnitFlagNotSelectable = 0x02000000;
 inline constexpr std::uint32_t UnitFlagFleeing = 0x00800000; // feared, or running at low health
+inline constexpr std::uint32_t UnitFlagOnTaxi = 0x00100000;  // flying a flight path
 inline constexpr std::uint32_t UnitFlagSkinnable = 0x04000000;
 inline constexpr std::uint32_t DynFlagLootable = 0x0001;
 inline constexpr std::uint32_t DynFlagTapped = 0x0004;
@@ -257,6 +258,8 @@ inline constexpr std::uint32_t TypeCorpse = 7;
 inline constexpr std::uint8_t GoTypeDoor = 0;
 inline constexpr std::uint8_t GoTypeChest = 3; // also herbs and mining veins
 inline constexpr std::uint8_t GoTypeGeneric = 5;
+inline constexpr std::uint8_t GoTypeTransport = 11;
+inline constexpr std::uint8_t GoTypeMoTransport = 15;
 inline constexpr std::uint8_t GoTypeFishingNode = 17;
 inline constexpr std::uint8_t GoTypeFishingHole = 25;
 } // namespace consts
