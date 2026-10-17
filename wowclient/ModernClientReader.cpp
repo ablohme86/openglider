@@ -2130,11 +2130,23 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
 
         if (car)
         {
-            s.player.position = *car + p;
+            // Its heading on the car is turned by as much as the car is: the
+            // bot turned to the way off by it, and walked off over the edge.
+            if (!carTurn_)
+            {
+                carTurn_ = normalizeAngle(lastHeadingInWorld_ - s.player.heading);
+            }
+
+            const float c = std::cos(*carTurn_);
+            const float sn = std::sin(*carTurn_);
+            s.player.position = *car + Vec3{p.x * c - p.y * sn, p.x * sn + p.y * c, p.z};
+            s.player.heading = normalizeHeading(s.player.heading + *carTurn_);
         }
         else if (!onACar)
         {
             lastInWorld_ = p;
+            lastHeadingInWorld_ = s.player.heading;
+            carTurn_.reset();
         }
     }
 

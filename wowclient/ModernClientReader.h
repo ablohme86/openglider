@@ -151,6 +151,11 @@ private:
     // Where the character last stood in the world: on a lift's car the client
     // gives its place on the car, and the car nearest this is the one it is on.
     std::optional<Vec3> lastInWorld_;
+    // The character's heading then, in the world, and how far the car is
+    // turned: its heading on the car is the car's, and the turn is what the
+    // heading changed by as it stepped on.
+    float lastHeadingInWorld_ = 0.0f;
+    std::optional<float> carTurn_;
 
     struct Object
     {
