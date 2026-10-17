@@ -148,6 +148,9 @@ private:
     // The map last known, while the same world stays loaded.
     std::optional<std::uint32_t> lastMap_;
     std::uint64_t lastMapManager_ = 0;
+    // Where the character last stood in the world: on a lift's car the client
+    // gives its place on the car, and the car nearest this is the one it is on.
+    std::optional<Vec3> lastInWorld_;
 
     struct Object
     {

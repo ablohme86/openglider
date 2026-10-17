@@ -408,6 +408,11 @@ private:
         // where it is stepped off to: the shaft itself is no ground on it.
         Vec3 waitAt;
         Vec3 stepOffTo;
+        // The way on from the other stop, walked off the car onto the map
+        // before the Navigator plans again: the car's floor is not on the map,
+        // and a way planned from it went from the ground under it - over the
+        // edge at the top of Thunder Bluff's.
+        std::vector<Vec3> offWay;
     };
     LiftWatch lifts_;
     std::optional<LiftRide> ride_;

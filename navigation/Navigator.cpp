@@ -471,6 +471,12 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             best = LiftRide{lift, fromTop, there};
             best->waitAt = waitAt;
             best->stepOffTo = Vec3{off.x, off.y, off.z} + offDir * (Lift::kFloor + 3.0f);
+            best->offWay.push_back(*offGround);
+
+            for (const auto& p : fromLift->points)
+            {
+                best->offWay.push_back(p);
+            }
             bestLength = length;
         }
     }
@@ -636,34 +642,62 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         return NavStatus::Moving;
     case LiftRide::Stage::Leaving:
     {
-        // Facing the way off from the car's floor, forward until the client
-        // tells where the bot is again: off the car, on the other level.
-        PlayerState onTheCar = snapshot.player;
-        onTheCar.position = off;
-        movement_.faceWhileMoving(onTheCar, r.stepOffTo, 0.3f);
-        movement_.setForward(true);
-        const bool offIt = !onCar(pos) && std::fabs(pos.z - off.z) <= 3.0f && distance2D(pos, off) >= Lift::kFloor - 1.0f;
+        constexpr float kOffTheCar = 10.0f;
+        const bool told = !onCar(pos) && std::fabs(pos.z - off.z) <= 3.0f;
 
-        if (offIt)
+        // Fallen off the edge: the other level below.
+        if (!onCar(pos) && pos.z < off.z - 6.0f && std::fabs(pos.z - on.z) > 3.0f)
         {
-            log_.info(logcat::Move, "off the lift at ({:.0f}, {:.0f}) - on to {}", r.lift.x, r.lift.y, r.to);
-            ride_.reset();
-            movement_.setForward(false);
-            clearPath();
-            stuck_.reset();
-            return std::nullopt;
+            return giveUp("fell off stepping off the car");
         }
 
-        if (now - r.since > kStepOffLongest)
+        // Still where it got on, a while after stepping off: it never went
+        // with the car. Until then, the client may yet be telling where it got
+        // on, as some do while riding.
+        if (!onCar(pos) && std::fabs(pos.z - on.z) <= 3.0f && std::fabs(on.z - off.z) > 6.0f && now - r.since > kStepOffLongest)
         {
-            // Still where it got on: it never went with the car.
-            if (!onCar(pos) && std::fabs(pos.z - on.z) <= 3.0f)
+            movement_.setForward(false);
+            stage(LiftRide::Stage::ToStop, "still at the stop it got on at - waiting for the next");
+            return NavStatus::Moving;
+        }
+
+        // Along the way on from the stop, onto the map, until well off the car.
+        Vec3 next = r.offWay.empty() ? r.stepOffTo : r.offWay.front();
+
+        if (told)
+        {
+            // Points reached, or nearer the shaft than the bot is, are behind it.
+            while (r.offWay.size() > 1 && (distance2D(pos, r.offWay.front()) <= 1.5f || distance2D(off, r.offWay.front()) < distance2D(off, pos)))
             {
-                movement_.setForward(false);
-                stage(LiftRide::Stage::ToStop, "still at the stop it got on at - waiting for the next");
-                return NavStatus::Moving;
+                r.offWay.erase(r.offWay.begin());
             }
 
+            next = r.offWay.empty() ? r.stepOffTo : r.offWay.front();
+
+            if (distance2D(pos, off) >= kOffTheCar)
+            {
+                log_.info(logcat::Move, "off the lift at ({:.0f}, {:.0f}) - on to {}", r.lift.x, r.lift.y, r.to);
+                ride_.reset();
+                movement_.setForward(false);
+                clearPath();
+                stuck_.reset();
+                return std::nullopt;
+            }
+        }
+
+        // Until the client tells where the bot is, it is on the car's floor.
+        PlayerState onTheCar = snapshot.player;
+
+        if (!told)
+        {
+            onTheCar.position = off;
+        }
+
+        movement_.faceWhileMoving(onTheCar, next, 0.3f);
+        movement_.setForward(true);
+
+        if (now - r.since > kStepOffLongest * 2)
+        {
             return giveUp("not off the car at the other stop");
         }
 

@@ -2107,6 +2107,37 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
 
     readBags(all, *self, s.player);
 
+    // On a lift's car the client gives the character's place on the car, a
+    // few yards from its middle: the radar drew it far off, and the bot took
+    // itself for somewhere else. The car's place added, it is where it is.
+    {
+        const Vec3 p = s.player.position;
+        const bool onACar = std::hypot(p.x, p.y) <= 12.0f && std::fabs(p.z) <= 6.0f;
+        std::optional<Vec3> car;
+
+        if (onACar && lastInWorld_)
+        {
+            for (const auto& obj : all)
+            {
+                GameObjectState g;
+
+                if (obj.type == modern::TypeGameObject && readGameObject(obj, g) && keptAtAnyDistance(g) && distance2D(g.position, *lastInWorld_) <= 30.0f && (!car || distance2D(g.position, *lastInWorld_) < distance2D(*car, *lastInWorld_)))
+                {
+                    car = g.position;
+                }
+            }
+        }
+
+        if (car)
+        {
+            s.player.position = *car + p;
+        }
+        else if (!onACar)
+        {
+            lastInWorld_ = p;
+        }
+    }
+
     std::vector<Guid> taggedByUs;
 
     for (const auto& obj : all)
