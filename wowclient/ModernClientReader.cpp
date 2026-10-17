@@ -570,6 +570,46 @@ void ModernClientReader::readPlayer(const Object& obj, PlayerState& p) const
 
     readSkills(obj, p);
     readQuestLog(obj, p);
+    readKnownTaxiNodes(obj, p);
+}
+
+void ModernClientReader::readKnownTaxiNodes(const Object& obj, PlayerState& p) const
+{
+    if (!L_.playerKnownTaxiNodes)
+    {
+        return;
+    }
+
+    const auto array = memory_.read<std::uint64_t>(obj.base + L_.playerKnownTaxiNodes);
+    const auto length = memory_.read<std::uint32_t>(obj.base + L_.playerKnownTaxiNodes + 8);
+
+    // 64 bytes on 1.60.1 (flight points up to 512); more is no bit array.
+    if (!array || !length || *length > 4096)
+    {
+        return;
+    }
+
+    std::vector<std::uint8_t> bits(*length);
+
+    if (*length > 0 && (!*array || !memory_.read(*array, bits.data(), bits.size())))
+    {
+        return;
+    }
+
+    std::vector<std::uint32_t> known;
+
+    for (std::size_t i = 0; i < bits.size(); ++i)
+    {
+        for (int b = 0; b < 8; ++b)
+        {
+            if (bits[i] & (1u << b))
+            {
+                known.push_back(static_cast<std::uint32_t>(i * 8 + b + 1));
+            }
+        }
+    }
+
+    p.knownTaxiNodes = std::move(known);
 }
 
 void ModernClientReader::readQuestLog(const Object& obj, PlayerState& p) const

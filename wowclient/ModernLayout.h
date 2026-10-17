@@ -153,6 +153,10 @@ struct ModernLayout
     std::uint32_t playerQuestLogStride = 0;
     // Within an entry: a u16 counter per objective, the first objective first.
     std::uint32_t playerQuestLogProgress = 0;
+    // The flight points learnt: a pointer to a bit array, its length in bytes
+    // after it; bit (id - 1) is TaxiNodes id's. Set without the flight map
+    // open. 0: not known.
+    std::uint32_t playerKnownTaxiNodes = 0;
     int inventoryBagFirst = 0; // the equipped bags
     int inventoryBagCount = 0;
     int inventoryBackpackFirst = 0;

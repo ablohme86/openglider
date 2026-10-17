@@ -170,6 +170,7 @@ private:
     void readPlayer(const Object& obj, PlayerState& p) const;
     void readSkills(const Object& obj, PlayerState& p) const;
     void readQuestLog(const Object& obj, PlayerState& p) const;
+    void readKnownTaxiNodes(const Object& obj, PlayerState& p) const;
     // Backpack and bag contents, and the free slots in them; equipment does not count.
     void readBags(const std::vector<Object>& all, const Object& self, PlayerState& p) const;
     void readAuras(std::uint64_t base, std::uint32_t clock, std::vector<Aura>& auras) const;

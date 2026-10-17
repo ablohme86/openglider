@@ -248,6 +248,9 @@ struct PlayerState : UnitState
     std::vector<ItemStack> bagItems; // backpack + bags
     // The ids of the quests in the quest log; empty when the client does not tell.
     std::vector<std::uint32_t> questLog;
+    // The flight points (TaxiNodes ids) the character has learnt, lowest
+    // first; nullopt when the client does not tell.
+    std::optional<std::vector<std::uint32_t>> knownTaxiNodes;
     // What has been killed for each quest in the log, objective by objective
     // (the order the quest lists its kill objectives in); items are counted in the bags.
     struct QuestProgress
