@@ -383,7 +383,7 @@ struct BotConfig
     // to the nearest trainer of the character's class to learn what it
     // teaches now.
     bool trainAbilities = true;
-    // Learn Flight Paths (General Settings): a flight master in sight with a
+    // Learn Flight Paths (General Settings): a flight master within 250 yd with a
     // flight path not learnt (the green "!") talked to on the way, so the
     // character knows it.
     bool learnFlightPaths = true;

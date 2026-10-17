@@ -24,10 +24,11 @@ namespace og
 
 namespace
 {
-// A flight master this close, its path not learnt: worth the steps.
-constexpr float kNear = 120.0f;
-// Walking there and talking: a flight master in sight is a minute off.
-const Duration kTimeout{90000};
+// A flight master this close, its path not learnt: worth the steps - as far
+// as the bot looks for anything (the scan range).
+constexpr float kNear = 250.0f;
+// Walking there and talking: a flight master in sight is two minutes off.
+const Duration kTimeout{120000};
 // After a try that came to nothing, that one not again for this long.
 const Duration kRetryAfter{600000};
 // Between talking and the flight map, and between one try and the next.
