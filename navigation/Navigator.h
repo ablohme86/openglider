@@ -148,6 +148,11 @@ public:
     {
         return ride_.has_value();
     }
+    // The heading off the car at the other stop, on a lift trip.
+    std::optional<float> liftExitHeading() const
+    {
+        return ride_ ? std::optional<float>{ride_->exitHeading} : std::nullopt;
+    }
 
     void setProvider(INavigationProvider& provider)
     {
@@ -408,17 +413,23 @@ private:
         // where it is stepped off to: the shaft itself is no ground on it.
         Vec3 waitAt;
         Vec3 stepOffTo;
-        // The way on from the other stop, walked off the car onto the map
-        // before the Navigator plans again: the car's floor is not on the map,
-        // and a way planned from it went from the ground under it - over the
-        // edge at the top of Thunder Bluff's.
-        std::vector<Vec3> offWay;
+        // The way off the car at the other stop, found when the trip is
+        // planned: the heading from the car's middle along which the map has
+        // ground farthest out (the plank into Thunder Bluff), and how far.
+        // Turned to while riding, and walked straight off along: the car's
+        // floor is not on the map, and the bot's place on it is a guess -
+        // steered by that, it walked over the edge beside the plank.
+        float exitHeading = 0.0f;
+        float exitReach = 0.0f;
     };
     LiftWatch lifts_;
     std::optional<LiftRide> ride_;
     // Where a lift took the bot to, for the destination asked for.
     std::optional<std::pair<Vec3, Vec3>> liftTo_;
     std::optional<Vec3> liftCheckedFor_;
+    // The lifts known when the way was last looked at for one: a lift learnt
+    // on the way is looked at for the destination again.
+    int liftsChecked_ = 0;
     std::optional<LiftRide> planLift(const GameSnapshot& snapshot, const Vec3& to);
     // The lift trip, while there is one: its status, or nullopt to walk on.
     std::optional<NavStatus> rideLift(const GameSnapshot& snapshot, Vec3& destination, bool exact);

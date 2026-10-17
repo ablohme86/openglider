@@ -70,6 +70,11 @@ public:
     {
         return lifts_;
     }
+    // Counts up with every lift learnt.
+    int revision() const
+    {
+        return static_cast<int>(lifts_.size());
+    }
     // The car of a lift, while it is in sight.
     std::optional<LiftCar> car(const Lift& lift) const;
     // A lift's object: one named so, a car or the shaft it goes in.

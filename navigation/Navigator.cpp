@@ -21,6 +21,7 @@
 #include "og/common/MathUtil.h"
 #include "og/navigation/Avoidance.h"
 
+#include <array>
 #include <cmath>
 #include <span>
 #include <random>
@@ -471,11 +472,69 @@ std::optional<Navigator::LiftRide> Navigator::planLift(const GameSnapshot& snaps
             best = LiftRide{lift, fromTop, there};
             best->waitAt = waitAt;
             best->stepOffTo = Vec3{off.x, off.y, off.z} + offDir * (Lift::kFloor + 3.0f);
-            best->offWay.push_back(*offGround);
+            best->exitHeading = headingTo(off, best->stepOffTo);
 
-            for (const auto& p : fromLift->points)
+            // The way off: round the other stop every 5 degrees, how far out
+            // the map has ground at its height. The farthest, and of those the
+            // middle of the widest run of headings (on a plank, its middle) -
+            // the one towards the destination where runs are alike.
+            constexpr int kSteps = 72;
+            std::array<float, kSteps> reach{};
+
+            for (int i = 0; i < kSteps; ++i)
             {
-                best->offWay.push_back(p);
+                const float h = static_cast<float>(i) * kTwoPi / kSteps;
+                const Vec3 d{std::cos(h), std::sin(h), 0.0f};
+
+                for (float out = Lift::kFloor + 1.0f; out <= 16.0f; out += 2.0f)
+                {
+                    const auto g = provider_->findWalkablePoint(off + d * out, 1.0f, 0.0f);
+
+                    if (!g || std::fabs(g->z - off.z) > 3.0f)
+                    {
+                        break;
+                    }
+
+                    reach[i] = out;
+                }
+            }
+
+            const float farthest = *std::max_element(reach.begin(), reach.end());
+            float bestToward = 0.0f;
+            int bestRun = 0;
+
+            for (int i = 0; i < kSteps && farthest > 0.0f; ++i)
+            {
+                // A run starts where the one before is short of the farthest.
+                if (reach[i] < farthest || reach[(i + kSteps - 1) % kSteps] >= farthest)
+                {
+                    continue;
+                }
+
+                int run = 0;
+
+                while (run < kSteps && reach[(i + run) % kSteps] >= farthest)
+                {
+                    ++run;
+                }
+
+                const float h = (static_cast<float>(i) + static_cast<float>(run - 1) * 0.5f) * kTwoPi / kSteps;
+                const float toward = distance2D(off + Vec3{std::cos(h), std::sin(h), 0.0f} * farthest, there);
+
+                if (run > bestRun || (run == bestRun && toward < bestToward))
+                {
+                    bestRun = run;
+                    bestToward = toward;
+                    best->exitHeading = normalizeHeading(h);
+                    best->exitReach = farthest;
+                }
+            }
+
+            // Ground all round (or none known): the heading towards the destination.
+            if (bestRun == 0 && farthest > 0.0f)
+            {
+                best->exitHeading = headingTo(off, there);
+                best->exitReach = farthest;
             }
             bestLength = length;
         }
@@ -505,13 +564,20 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         ride_.reset();
     }
 
-    if (!ride_ && (!liftCheckedFor_ || distance(*liftCheckedFor_, destination) > 5.0f))
+    if (!ride_ && (!liftCheckedFor_ || distance(*liftCheckedFor_, destination) > 5.0f || liftsChecked_ != lifts_.revision()))
     {
+        if (liftsChecked_ != lifts_.revision() && liftCheckedFor_)
+        {
+            log_.info(logcat::Move, "a lift learnt on the way - looking at the way to {} again", destination);
+        }
+
         liftCheckedFor_ = destination;
+        liftsChecked_ = lifts_.revision();
 
         if (auto ride = planLift(snapshot, destination))
         {
-            log_.info(logcat::Move, "the way to {} goes by the lift at ({:.0f}, {:.0f}), {} - to its stop at {}", destination, ride->lift.x, ride->lift.y, ride->fromTop ? "down" : "up", ride->lift.stop(ride->fromTop));
+            log_.info(logcat::Move, "the way to {} goes by the lift at ({:.0f}, {:.0f}), {} - to its stop at {}, off it heading {:.0f} degrees, ground {:.0f} yd out", destination, ride->lift.x, ride->lift.y, ride->fromTop ? "down" : "up", ride->lift.stop(ride->fromTop),
+                      ride->exitHeading * 180.0f / kPi, ride->exitReach);
             liftTo_ = std::pair{destination, ride->to};
             liftCheckedFor_ = ride->to;
             destination = ride->to;
@@ -620,7 +686,8 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         movement_.setForward(true);
         return NavStatus::Moving;
     case LiftRide::Stage::Riding:
-        movement_.stop();
+        // Turned already the way off the car at the other stop.
+        movement_.faceHeading(snapshot.player, r.exitHeading, 0.1f);
 
         // Where the bot got on, on the ground beside the shaft, while the car
         // is gone: it was not on it.
@@ -642,7 +709,6 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
         return NavStatus::Moving;
     case LiftRide::Stage::Leaving:
     {
-        constexpr float kOffTheCar = 10.0f;
         const bool told = !onCar(pos) && std::fabs(pos.z - off.z) <= 3.0f;
 
         // Fallen off the edge: the other level below.
@@ -661,40 +727,23 @@ std::optional<NavStatus> Navigator::rideLift(const GameSnapshot& snapshot, Vec3&
             return NavStatus::Moving;
         }
 
-        // Along the way on from the stop, onto the map, until well off the car.
-        Vec3 next = r.offWay.empty() ? r.stepOffTo : r.offWay.front();
+        // Straight along the way off, the heading kept whatever the bot's
+        // place on the car is taken for, until well out on the map.
+        const Vec3 along{std::cos(r.exitHeading), std::sin(r.exitHeading), 0.0f};
+        const float wellOff = std::max(Lift::kFloor + 3.0f, std::min(r.exitReach - 1.0f, 12.0f));
 
-        if (told)
+        if (told && distance2D(pos, off) >= wellOff)
         {
-            // Points reached, or nearer the shaft than the bot is, are behind it.
-            while (r.offWay.size() > 1 && (distance2D(pos, r.offWay.front()) <= 1.5f || distance2D(off, r.offWay.front()) < distance2D(off, pos)))
-            {
-                r.offWay.erase(r.offWay.begin());
-            }
-
-            next = r.offWay.empty() ? r.stepOffTo : r.offWay.front();
-
-            if (distance2D(pos, off) >= kOffTheCar)
-            {
-                log_.info(logcat::Move, "off the lift at ({:.0f}, {:.0f}) - on to {}", r.lift.x, r.lift.y, r.to);
-                ride_.reset();
-                movement_.setForward(false);
-                clearPath();
-                stuck_.reset();
-                return std::nullopt;
-            }
+            log_.info(logcat::Move, "off the lift at ({:.0f}, {:.0f}) - on to {}", r.lift.x, r.lift.y, r.to);
+            ride_.reset();
+            movement_.setForward(false);
+            clearPath();
+            stuck_.reset();
+            return std::nullopt;
         }
 
-        // Until the client tells where the bot is, it is on the car's floor.
-        PlayerState onTheCar = snapshot.player;
-
-        if (!told)
-        {
-            onTheCar.position = off;
-        }
-
-        movement_.faceWhileMoving(onTheCar, next, 0.3f);
-        movement_.setForward(true);
+        const bool facing = movement_.faceWhileMoving(snapshot.player, snapshot.player.position + along * 100.0f, 0.15f);
+        movement_.setForward(facing || movement_.isMovingForward());
 
         if (now - r.since > kStepOffLongest * 2)
         {
