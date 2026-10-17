@@ -53,6 +53,8 @@ struct SimMobTemplate
     float runSpeed = 6.5f;
     // Another player's: tapped by someone else from the start.
     bool tappedByOther = false;
+    // Not to be attacked (a quest NPC, a guard).
+    bool attackable = true;
 };
 
 struct SimSpawn

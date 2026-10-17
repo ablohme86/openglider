@@ -1639,8 +1639,9 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
                     continue;
                 }
 
-                // Another player's: Pull would leave it alone once there.
-                if (u.isTappedByOther || (u.inCombat && u.targetGuid != 0 && u.targetGuid != s.player.guid))
+                // Another player's, or one not to be attacked: Pull would leave
+                // it alone once there.
+                if (u.isTappedByOther || !u.isAttackable || (u.inCombat && u.targetGuid != 0 && u.targetGuid != s.player.guid))
                 {
                     continue;
                 }

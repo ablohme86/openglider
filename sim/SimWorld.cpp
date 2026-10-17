@@ -1099,6 +1099,7 @@ GameSnapshot SimWorld::snapshot() const
         u.targetGuid = u.inCombat ? player_.guid : 0;
         u.isLootable = m.dead && m.lootable;
         u.isTappedByOther = m.tpl.tappedByOther;
+        u.isAttackable = m.tpl.attackable;
         u.isSkinnable = m.dead && m.skinnable;
 
         for (const auto& a : m.auras)
