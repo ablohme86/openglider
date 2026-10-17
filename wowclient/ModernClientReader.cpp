@@ -393,6 +393,7 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
     u.inCombat = (flags & c::UnitFlagInCombat) != 0;
     u.isSkinnable = (flags & c::UnitFlagSkinnable) != 0;
     u.isFleeing = (flags & c::UnitFlagFleeing) != 0;
+    u.isOnTaxi = (flags & c::UnitFlagOnTaxi) != 0;
     u.isAttackable = (flags & (c::UnitFlagNonAttackable | c::UnitFlagImmuneToPc | c::UnitFlagNotSelectable)) == 0;
     u.isDead = u.health == 0;
 

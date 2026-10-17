@@ -7,6 +7,7 @@ og_add_module(world
         ZoneBounds.cpp
         QuestSource.cpp
         TravelGraph.cpp
+        TaxiNetwork.cpp
         QuestClusterer.cpp
         QuestScorer.cpp
         WorldModel.cpp

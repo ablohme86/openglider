@@ -97,6 +97,7 @@ struct UnitState
     bool isVendor = false;    // sells goods (NPC flag), so the bot can unload at it
     bool canRepair = false;   // also repairs (NPC flag)
     bool isFlightMaster = false; // flies players about (NPC flag)
+    bool isOnTaxi = false;       // flying a flight path (unit flag)
     // A flight master whose flight path the character has not learnt: the
     // green "!" over its head.
     bool newFlightPath = false;

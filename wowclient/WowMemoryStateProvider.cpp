@@ -576,6 +576,7 @@ bool WowMemoryStateProvider::readUnit(const RawObject& obj, UnitState& u) const
     u.inCombat = (flags & c::UnitFlagInCombat) != 0;
     u.isSkinnable = (flags & c::UnitFlagSkinnable) != 0;
     u.isFleeing = (flags & c::UnitFlagFleeing) != 0;
+    u.isOnTaxi = (flags & c::UnitFlagOnTaxi) != 0;
     u.isLootable = (dyn & c::DynFlagLootable) != 0;
     u.isTappedByOther = (dyn & c::DynFlagTapped) != 0 && (dyn & L.dynFlagTappedByPlayer) == 0;
     // NPCs with a service (vendor, quest giver, guard gossip, ...) or flagged

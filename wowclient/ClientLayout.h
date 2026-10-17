@@ -240,6 +240,7 @@ inline constexpr std::uint32_t UnitFlagImmuneToPc = 0x00000100; // 1.x: "not att
 inline constexpr std::uint32_t UnitFlagInCombat = 0x00080000;
 inline constexpr std::uint32_t UnitFlagNotSelectable = 0x02000000;
 inline constexpr std::uint32_t UnitFlagFleeing = 0x00800000; // feared, or running at low health
+inline constexpr std::uint32_t UnitFlagOnTaxi = 0x00100000;  // flying a flight path
 inline constexpr std::uint32_t UnitFlagSkinnable = 0x04000000;
 inline constexpr std::uint32_t DynFlagLootable = 0x0001;
 inline constexpr std::uint32_t DynFlagTapped = 0x0004;
