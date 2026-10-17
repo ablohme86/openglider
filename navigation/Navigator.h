@@ -21,6 +21,7 @@
 #include "og/common/EventBus.h"
 #include "og/common/Log.h"
 #include "og/navigation/INavigationProvider.h"
+#include "og/navigation/Lifts.h"
 #include "og/navigation/MovementController.h"
 #include "og/navigation/ObstacleMemory.h"
 #include "og/navigation/StuckDetector.h"
@@ -135,6 +136,17 @@ public:
     const std::vector<AvoidZone>& mobZones() const
     {
         return mobZones_;
+    }
+
+    // The lifts known, and their cars in sight.
+    const LiftWatch& lifts() const
+    {
+        return lifts_;
+    }
+    // Riding a lift, or on the way to one, waiting for its car.
+    bool onLiftTrip() const
+    {
+        return ride_.has_value();
     }
 
     void setProvider(INavigationProvider& provider)
@@ -371,6 +383,37 @@ private:
 
     StuckDetector stuck_;
     StuckRecovery recovery_;
+
+    // A way up to Thunder Bluff's mesa, or down from it, by lift: to where its
+    // car stops, waited for there, ridden, and stepped off at the other stop.
+    // Riding, the client tells the character where it got on until it steps
+    // off: the car's height says where it is.
+    struct LiftRide
+    {
+        Lift lift;
+        bool fromTop = false;
+        // The destination on the other level: a vendor's place in the quest
+        // data has no height, and the character's was taken for it.
+        Vec3 to;
+        enum class Stage
+        {
+            ToStop,
+            Waiting,
+            Boarding,
+            Riding,
+            Leaving
+        } stage = Stage::ToStop;
+        TimePoint since{};
+        std::optional<Vec3> stepOff;
+    };
+    LiftWatch lifts_;
+    std::optional<LiftRide> ride_;
+    // Where a lift took the bot to, for the destination asked for.
+    std::optional<std::pair<Vec3, Vec3>> liftTo_;
+    std::optional<Vec3> liftCheckedFor_;
+    std::optional<LiftRide> planLift(const GameSnapshot& snapshot, const Vec3& to);
+    // The lift trip, while there is one: its status, or nullopt to walk on.
+    std::optional<NavStatus> rideLift(const GameSnapshot& snapshot, Vec3& destination, bool exact);
 
     std::optional<Vec3> destination_;
     Path path_;

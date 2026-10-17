@@ -83,10 +83,11 @@ bool isEventVendor(std::string_view name, std::string_view subName)
     return false;
 }
 
-// Thunder Bluff and Undercity are reached by lift, which the bot does not take.
+// Undercity is reached by lifts the bot does not know yet. Thunder Bluff's it
+// takes (Navigator: LiftWatch).
 bool reachedByLift(std::uint32_t zone)
 {
-    return zone == 1638 || zone == 1497;
+    return zone == 1497;
 }
 
 namespace
