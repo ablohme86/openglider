@@ -79,6 +79,11 @@ public:
     // A manually requested journey owns navigation, even while paused. Only
     // self-defense and emergency combat actions may interrupt it.
     void setManualTravel(bool active);
+    // On a flight path: nothing to do until it lands.
+    bool onTaxi() const
+    {
+        return onTaxi_;
+    }
     bool manualTravel() const
     {
         return manualTravel_;
@@ -131,6 +136,7 @@ private:
     std::atomic<EngineState> state_{EngineState::Running};
     bool waitingForGame_ = false;
     bool manualTravel_ = false;
+    bool onTaxi_ = false;
     bool travelDefense_ = false;
     std::uint64_t ticks_ = 0;
 };

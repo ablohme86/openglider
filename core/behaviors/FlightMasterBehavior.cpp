@@ -66,7 +66,7 @@ constexpr std::string_view kCloseMap = "if CloseTaxiMap then CloseTaxiMap() end;
 
 bool FlightMasterBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
 {
-    if (!ctx.config.learnFlightPaths || s.isDead() || ctx.partyFollower())
+    if (!ctx.config.learnFlightPaths || s.isDead() || ctx.partyFollower() || s.player.isOnTaxi)
     {
         npc_ = 0;
         return false;

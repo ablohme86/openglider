@@ -1797,7 +1797,7 @@ std::vector<std::string> BotInstance::pullActionsOffBars() const
 void BotInstance::updateStatus()
 {
     std::lock_guard lock(statusMutex_);
-    status_.behavior = engine_.currentName();
+    status_.behavior = engine_.onTaxi() ? std::string("Flying") : engine_.currentName();
     status_.objective = objectives_.describe();
     status_.lastAction = actions_.lastAction().value_or("");
     status_.profile = profile_ ? profile_->name : "";
