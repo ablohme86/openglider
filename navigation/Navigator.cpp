@@ -2605,6 +2605,80 @@ NavStatus Navigator::moveFlat(const GameSnapshot& snapshot, const Vec3& destinat
         const float direction = delta > 0 ? 1.0f : -1.0f;
         const float angle = std::min(std::abs(delta), movement_.estimatedTurnRate() * 0.65f);
         Vec3 previous = player.position;
+        // Close by the way itself the arc is on its ground, whatever the map
+        // says of each step of it: up the narrow stair round the pillar of
+        // Orgrimmar's flight tower each step left the map's edge, and the bot
+        // stopped to turn on the spot at every bend. The way's legs on the
+        // character's level only - the stair's turns above and below are as
+        // near from above.
+        // Only where the way winds round: more than 100 degrees one way within
+        // 8 yd - a stair round a pillar, not a corner of a wall, which the arc
+        // is still kept off by the map.
+        float winding = 0.0f;
+        {
+            // The way's own bends: from where the bot is the first leg may
+            // point back, the bot a little off the way.
+            float run = distance2D(player.position, path_.points[pathIndex_]);
+            Vec3 at = pathIndex_ > 0 ? path_.points[pathIndex_ - 1] : player.position;
+
+            for (std::size_t j = pathIndex_; j + 1 < path_.points.size() && run < 8.0f; ++j)
+            {
+                const Vec3 leg = path_.points[j] - at, next = path_.points[j + 1] - path_.points[j];
+
+                if (leg.length2D() > 0.05f && next.length2D() > 0.05f)
+                {
+                    const float turn = normalizeAngle(std::atan2(next.y, next.x) - std::atan2(leg.y, leg.x));
+
+                    if (winding != 0.0f && turn * winding < 0.0f)
+                    {
+                        winding = 0.0f;
+                        break;
+                    }
+
+                    winding += turn;
+                }
+
+                run += next.length2D();
+                at = path_.points[j];
+            }
+        }
+
+        const bool windsRound = std::fabs(winding) > 1.75f;
+        const auto byTheWay = [&](const Vec3& point)
+        {
+            if (!windsRound)
+            {
+                return false;
+            }
+
+            constexpr float kNearWay = 1.25f, kLevel = 3.0f;
+            Vec3 from = pathIndex_ > 0 ? path_.points[pathIndex_ - 1] : player.position;
+
+            for (std::size_t j = pathIndex_; j < path_.points.size() && j < pathIndex_ + 12; ++j)
+            {
+                const Vec3 to = path_.points[j];
+                const Vec3 leg = to - from;
+                const float length2 = leg.x * leg.x + leg.y * leg.y;
+                const float t = length2 > 0.0001f ? std::clamp(((point.x - from.x) * leg.x + (point.y - from.y) * leg.y) / length2, 0.0f, 1.0f) : 0.0f;
+                const Vec3 on = from + leg * t;
+
+                // Only on the outside of the bend, where a run too wide for it
+                // goes: what the way turns round - a wall's corner, the stair's
+                // pillar - lies on the inside, and is kept clear of by the map.
+                const float side = leg.x * (point.y - on.y) - leg.y * (point.x - on.x);
+                const Vec3 nextLeg = j + 1 < path_.points.size() ? path_.points[j + 1] - to : leg;
+                const float bend = leg.x * nextLeg.y - leg.y * nextLeg.x;
+
+                if (distance2D(point, on) <= kNearWay && std::fabs(on.z - player.position.z) <= kLevel && side * bend < 0.0f)
+                {
+                    return true;
+                }
+
+                from = to;
+            }
+
+            return false;
+        };
 
         if (angle < 0.02f)
         {
@@ -2622,7 +2696,7 @@ NavStatus Navigator::moveFlat(const GameSnapshot& snapshot, const Vec3& destinat
             const float heading = player.heading + direction * angle * sample / 5;
             const Vec3 next = player.position + Vec3{direction * turnRadius * (std::sin(heading) - std::sin(player.heading)), direction * turnRadius * (std::cos(player.heading) - std::cos(heading)), 0};
 
-            if (!walkableArcSegment(*provider_, previous, next) || !clearOfZones(previous, next, zones))
+            if ((!walkableArcSegment(*provider_, previous, next) && !byTheWay(next)) || !clearOfZones(previous, next, zones))
             {
                 allowMovingTurn = false;
                 break;
