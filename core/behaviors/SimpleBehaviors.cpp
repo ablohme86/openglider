@@ -1639,12 +1639,27 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
                     continue;
                 }
 
+                // Another player's: Pull would leave it alone once there.
+                if (u.isTappedByOther || (u.inCombat && u.targetGuid != 0 && u.targetGuid != s.player.guid))
+                {
+                    continue;
+                }
+
                 if (std::fabs(u.position.z - pos.z) < kOtherLevel || distance2D(u.position, pos) > kSightAcross || (ctx.obstacles && ctx.obstacles->avoids(u.position)) || ctx.dangerAt(u.position))
                 {
                     continue;
                 }
 
-                if (!mob || distance(u.position, pos) < distance(mob->position, pos))
+                // The one gone for is kept while it will do: with one above and
+                // one below, the nearest changed with every step towards either,
+                // and the bot turned from one to the other for as long as it stood
+                // between them.
+                if (mob && mob->guid == questSpotMob_)
+                {
+                    continue;
+                }
+
+                if (!mob || u.guid == questSpotMob_ || distance(u.position, pos) < distance(mob->position, pos))
                 {
                     mob = &u;
                     mobOf = &target;

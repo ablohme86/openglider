@@ -51,6 +51,8 @@ struct SimMobTemplate
     Classification classification = Classification::Normal;
     bool skinnable = true;
     float runSpeed = 6.5f;
+    // Another player's: tapped by someone else from the start.
+    bool tappedByOther = false;
 };
 
 struct SimSpawn

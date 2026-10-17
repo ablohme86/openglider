@@ -63,6 +63,32 @@ bool isMountVendor(std::string_view subName)
     return false;
 }
 
+// A vendor of a holiday (Lunar Festival, Hallow's End) or of the Darkmoon
+// Faire: in the data all year, there only while it lasts.
+bool isEventVendor(std::string_view name, std::string_view subName)
+{
+    if (name.find("Festival") != std::string_view::npos)
+    {
+        return true;
+    }
+
+    for (const std::string_view title : {"Hallow's End", "Darkmoon Faire", "Lunar Festival", "Midsummer", "Brewfest", "Winter Veil"})
+    {
+        if (subName.find(title) != std::string_view::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Thunder Bluff and Undercity are reached by lift, which the bot does not take.
+bool reachedByLift(std::uint32_t zone)
+{
+    return zone == 1638 || zone == 1497;
+}
+
 namespace
 {
 
@@ -546,7 +572,7 @@ bool QuestSource::loadFromDb(const std::filesystem::path& dbPath, MapOfZone mapO
             const auto friendlyTo = npcStmt.columnString(5);
             const auto flags = npcStmt.columnInt(6);
 
-            if ((flags & 4) && !isMountVendor(subName))
+            if ((flags & 4) && !isMountVendor(subName) && !isEventVendor(name, subName))
             {
                 vendors_.emplace_back(entry, friendlyTo);
                 repairers_[entry] = (flags & 16384) != 0;
@@ -781,7 +807,10 @@ bool QuestSource::loadFromJson(std::string_view questsText, std::string_view npc
             const int flags = n.find("npcFlags") ? n.find("npcFlags")->asInt() : 0;
             const Json* subName = n.find("subName");
 
-            if ((flags & 4) && !(subName && subName->isString() && isMountVendor(subName->asString(""))))
+            const std::string vendorName = n.find("name") && n.find("name")->isString() ? n.find("name")->asString("") : std::string();
+            const std::string vendorTitle = subName && subName->isString() ? subName->asString("") : std::string();
+
+            if ((flags & 4) && !isMountVendor(vendorTitle) && !isEventVendor(vendorName, vendorTitle))
             {
                 vendors_.emplace_back(entry, n.find("friendlyTo") ? n.find("friendlyTo")->asString("") : "");
                 repairers_[entry] = (flags & 16384) != 0;
@@ -1589,6 +1618,12 @@ std::vector<VendorSpot> QuestSource::vendorSpots(const GameSnapshot& s)
                 {
                     continue;
                 }
+            }
+
+            // Unless the character is up there already.
+            if (reachedByLift(canonicalZone(spawn.zone)) && canonicalZone(spawn.zone) != here)
+            {
+                continue;
             }
 
             auto position = zones_.toWorld(spawn.zone, spawn.x, spawn.y);
