@@ -309,10 +309,11 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
 
     // A gossip first, where it has one: the line to fly by - Omusa
     // Thunderhorn's in Camp Taurajo, "I need a ride.", others' "Show me where
-    // I can fly."
+    // I can fly." - in the game's other languages too: "Zeigt mir, wohin ich
+    // fliegen kann.", "Montrez-moi où je peux voler." ...
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        for (const std::string_view phrase : {"ride", "fly", "Fly", "flight", "Flight", "travel", "飛", "飞"})
+        for (const std::string_view phrase : {"ride", "fly", "flight", "travel", "flieg", "flug", "reise", "voler", "volar", "voar", "viaj", "полет", "лететь", "날아", "비행", "飛", "飞"})
         {
             for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
             {
@@ -323,6 +324,35 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
                     return Status::Running;
                 }
             }
+        }
+
+        // None of those words: a flight master's gossip with its greeting and
+        // one line under it has that line to fly by, whatever it says.
+        std::vector<UiFrame> lines;
+
+        for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", ""))
+        {
+            if (line.visible && line.bottom - line.top < 0.03f)
+            {
+                lines.push_back(line);
+            }
+        }
+
+        if (!lines.empty() && lines.size() <= 2)
+        {
+            const auto lowest = std::max_element(lines.begin(), lines.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+
+            if (clickAt(ctx, *lowest))
+            {
+                ctx.log.info(logcat::Move, "flight: the flight master's gossip line known by no word - its only line clicked");
+                gossipChosen_ = true;
+                talkedAt_ = now;
+                return Status::Running;
+            }
+        }
+        else if (!lines.empty())
+        {
+            ctx.log.info(logcat::Move, "flight: the flight master's gossip has {} lines and none known to fly by", lines.size());
         }
     }
 
