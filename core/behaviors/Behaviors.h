@@ -881,6 +881,10 @@ private:
     std::vector<std::uint64_t> readOwners_;
     std::vector<std::size_t> rewardsTried_;
     bool rewardClicked_ = false;
+    // The reward clicked, how often, and when Complete Quest was clicked after it.
+    std::optional<std::size_t> picked_;
+    int pickClicks_ = 0;
+    std::optional<TimePoint> completeAt_;
     bool completed_ = false; // Complete Quest clicked
     int progressPanelClicks_ = 0;
     int completeClicks_ = 0;
