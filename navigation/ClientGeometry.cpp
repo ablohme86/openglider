@@ -682,6 +682,15 @@ std::vector<float> liquidLevels(Bytes mh2o)
 constexpr float kRoadUnderWater = 0.2f;
 // Deeper than this, the character swims: the ground is a lake's bed.
 constexpr float kSwimmingDepth = 1.5f;
+// A lake's or a river's bank is painted with the dirt the roads are, in a
+// ring round the water as long as any road: no road this many cells (4.17 yd
+// each) from water standing over the ground. East of Goldshire the way to
+// Fargodeep went round the lake on its bank.
+constexpr int kRoadOffShore = 3;
+// Steeper than this (tan 25 degrees), the dirt is a hillside's: the rocky
+// hills north of Goldshire have it in patches that run together, 39 degrees
+// on the middle one, where its roads have 5.
+constexpr float kRoadSlope = 0.47f;
 
 } // namespace
 
@@ -771,6 +780,8 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
     // The cells tagged road, and the first of each one's four triangles.
     std::vector<std::uint8_t> tagged_(roads && roadsOnly ? 256 * 64 : 0, 0);
     std::vector<std::size_t> firstOf(tagged_.size(), 0);
+    // The cells with water over their middle, and those too steep for a road.
+    std::vector<std::uint8_t> wet(tagged_.size(), 0), steep(tagged_.size(), 0);
     const auto water = liquidLevels(chunk(bytes, "MH2O"));
     const bool tagged = roads || !water.empty();
     int chunkIndex = 0;
@@ -851,6 +862,18 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
                            const std::uint8_t tag = depth > kSwimmingDepth ? kSwimmingGround : roads && thisChunk < 256 && !underWater && roadCells[cellIndex] ? kRoadGround : 0;
                            geometry.roads.resize(geometry.triangles.size() / 3 - 4, 0);
 
+                           if (depth > 0 && !wet.empty())
+                           {
+                               wet[cellIndex] = 1;
+                           }
+
+                           if (!steep.empty())
+                           {
+                               const auto z = [&](int v) { return geometry.vertices[static_cast<std::size_t>(v)].z; };
+                               const float dx = (z(d) + z(e) - z(a) - z(b)) / (2 * cell), dy = (z(b) + z(e) - z(a) - z(d)) / (2 * cell);
+                               steep[cellIndex] = std::hypot(dx, dy) > kRoadSlope ? 1 : 0;
+                           }
+
                            if (tag == kRoadGround && !tagged_.empty())
                            {
                                tagged_[cellIndex] = 1;
@@ -875,7 +898,36 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
 
     if (!tagged_.empty())
     {
-        const auto kept = keepRoads(tagged_);
+        // The cells by layout row and column, as keepRoads has them.
+        constexpr int kSide = 128;
+        const auto at = [](int row, int col) { return static_cast<std::size_t>((row / 8 * 16 + col / 8) * 64 + (row % 8) * 8 + col % 8); };
+        auto inland = tagged_;
+
+        for (std::size_t i = 0; i < inland.size(); ++i)
+        {
+            inland[i] = inland[i] && !steep[i] ? 1 : 0;
+        }
+
+        for (int row = 0; row < kSide; ++row)
+        {
+            for (int col = 0; col < kSide; ++col)
+            {
+                if (!wet[at(row, col)])
+                {
+                    continue;
+                }
+
+                for (int r = std::max(0, row - kRoadOffShore); r <= std::min(kSide - 1, row + kRoadOffShore); ++r)
+                {
+                    for (int c = std::max(0, col - kRoadOffShore); c <= std::min(kSide - 1, col + kRoadOffShore); ++c)
+                    {
+                        inland[at(r, c)] = 0;
+                    }
+                }
+            }
+        }
+
+        const auto kept = keepRoads(std::move(inland));
 
         for (std::size_t cell = 0; cell < tagged_.size(); ++cell)
         {

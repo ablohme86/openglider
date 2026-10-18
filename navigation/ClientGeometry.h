@@ -57,8 +57,8 @@ using ClientFileReader = std::function<std::vector<std::uint8_t>(std::uint32_t)>
 // The terrain of a root ADT; `roadCells` (from parseAdtRoadCells, or empty)
 // marks the triangles of each road cell.
 // With `roadsOnly`, only what keepRoads takes for a road is tagged as one -
-// looked at once the water has been taken out, which leaves a stream's dirt
-// bed as two thin banks.
+// looked at once the water, the banks round it and the steep hillsides have
+// been taken out, their dirt being the roads' own.
 CollisionGeometry parseAdtTerrain(std::span<const std::uint8_t> bytes, std::span<const std::uint8_t> roadCells = {}, bool roadsOnly = false);
 // How high the water stands over each of a terrain tile's 256 * 64 cells
 // (MH2O), NaN where there is none; empty without any.
