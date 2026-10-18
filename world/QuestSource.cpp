@@ -227,6 +227,11 @@ void QuestSource::useGameNames(const GameNames& names)
 
     for (auto& [id, quest] : quests_)
     {
+        if (quest.englishName.empty())
+        {
+            quest.englishName = quest.name;
+        }
+
         use(quest.name, names.quest(id));
     }
 
@@ -955,9 +960,10 @@ bool QuestSource::isDungeonQuest(std::uint32_t questId) const
     }
 
     const Quest& q = it->second;
-    if (hasTag(q.name, "[dungeon]") || hasTag(q.name, "(dungeon)") ||
-        hasTag(q.name, "[raid]") || hasTag(q.name, "(raid)") ||
-        hasTag(q.name, "[heroic]") || hasTag(q.name, "(heroic)"))
+    const std::string& name = q.originalName();
+    if (hasTag(name, "[dungeon]") || hasTag(name, "(dungeon)") ||
+        hasTag(name, "[raid]") || hasTag(name, "(raid)") ||
+        hasTag(name, "[heroic]") || hasTag(name, "(heroic)"))
     {
         return true;
     }
@@ -1039,14 +1045,14 @@ bool QuestSource::isCampingQuest(std::uint32_t questId) const
         return false;
     }
 
-    const std::string& name = it->second.name;
+    const std::string& name = it->second.originalName();
     return name == "The Adventurer" || name == "The Great Outdoors" || name.starts_with("Camping 101:");
 }
 
 bool QuestSource::isQuestTheBotCannotDo(std::uint32_t questId) const
 {
     const auto it = quests_.find(questId);
-    return it != quests_.end() && it->second.name == "Kyle's Gone Missing!";
+    return it != quests_.end() && it->second.originalName() == "Kyle's Gone Missing!";
 }
 
 bool QuestSource::isEliteQuest(std::uint32_t questId) const
@@ -1058,7 +1064,8 @@ bool QuestSource::isEliteQuest(std::uint32_t questId) const
     }
 
     const Quest& q = it->second;
-    if (hasTag(q.name, "[elite]") || hasTag(q.name, "(elite)"))
+    const std::string& name = q.originalName();
+    if (hasTag(name, "[elite]") || hasTag(name, "(elite)"))
     {
         return true;
     }
