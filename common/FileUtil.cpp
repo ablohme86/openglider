@@ -201,9 +201,25 @@ std::filesystem::path executableDirectory()
 
 std::string textLocaleOf(std::string_view configWtf)
 {
-    static const std::regex line(R"re(^[ \t]*SET[ \t]+textLocale[ \t]+"(\w{4})")re", std::regex::icase | std::regex::multiline);
-    std::match_results<std::string_view::const_iterator> m;
-    return std::regex_search(configWtf.begin(), configWtf.end(), m, line) ? m[1].str() : std::string("enUS");
+    // Line by line: std::regex's multiline is C++17's, and MSVC has none.
+    static const std::regex line(R"re([ \t]*SET[ \t]+textLocale[ \t]+"(\w{4})".*)re", std::regex::icase);
+
+    for (std::size_t start = 0; start < configWtf.size();)
+    {
+        const auto end = std::min(configWtf.find('\n', start), configWtf.size());
+        // A Windows line's \r is no part of it.
+        const auto last = end > start && configWtf[end - 1] == '\r' ? end - 1 : end;
+        std::match_results<std::string_view::const_iterator> m;
+
+        if (std::regex_match(configWtf.begin() + start, configWtf.begin() + last, m, line))
+        {
+            return m[1].str();
+        }
+
+        start = end + 1;
+    }
+
+    return "enUS";
 }
 
 } // namespace og

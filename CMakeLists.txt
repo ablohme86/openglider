@@ -35,6 +35,12 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+    # The sources are UTF-8 (the game's names in its other languages among them):
+    # MSVC reads them in the system's code page otherwise.
+    if(MSVC)
+        add_compile_options(/utf-8)
+    endif()
+
     if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
         set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
     endif()
