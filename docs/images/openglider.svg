@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <linearGradient id="gearGrad" x1="0" y1="8" x2="0" y2="248" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f2cf78"/>
+      <stop offset="55%" stop-color="#c8913a"/>
+      <stop offset="100%" stop-color="#7a5218"/>
+    </linearGradient>
+    <linearGradient id="skinGrad" x1="0" y1="66" x2="0" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8cbc4a"/>
+      <stop offset="100%" stop-color="#4f7a26"/>
+    </linearGradient>
+    <linearGradient id="plateGrad" x1="0" y1="66" x2="0" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e8eef3"/>
+      <stop offset="100%" stop-color="#6e7a86"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Gear -->
+  <path d="M 106.6,32.4 L 108.9,7.5 L 147.1,7.5 L 149.4,32.4 L 180.5,45.3 L 199.7,29.3 L 226.7,56.3 L 210.7,75.5 L 223.6,106.6 L 248.5,108.9 L 248.5,147.1 L 223.6,149.4 L 210.7,180.5 L 226.7,199.7 L 199.7,226.7 L 180.5,210.7 L 149.4,223.6 L 147.1,248.5 L 108.9,248.5 L 106.6,223.6 L 75.5,210.7 L 56.3,226.7 L 29.3,199.7 L 45.3,180.5 L 32.4,149.4 L 7.5,147.1 L 7.5,108.9 L 32.4,106.6 L 45.3,75.5 L 29.3,56.3 L 56.3,29.3 L 75.5,45.3 Z" fill="url(#gearGrad)" stroke="#2a1a06" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Circuit traces on the dark ring -->
+  <g fill="none" stroke="#38d6e8" stroke-width="3" stroke-linecap="round" opacity="0.85">
+    <path d="M 128,46 L 128,60"/>
+    <path d="M 90,56 L 98,64"/>
+    <path d="M 166,56 L 158,64"/>
+  </g>
+  <g fill="#38d6e8">
+    <circle cx="128" cy="46" r="4"/>
+    <circle cx="90" cy="56" r="4"/>
+    <circle cx="166" cy="56" r="4"/>
+  </g>
+  <g transform="translate(128,128) scale(1.15) translate(-128,-128)">
+  <!-- Ears: the left one flesh, the right one steel -->
+  <path d="M 70,118 L 30,96 L 66,142 Z" fill="url(#skinGrad)" stroke="#1a2a0a" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M 186,118 L 226,96 L 190,142 Z" fill="url(#plateGrad)" stroke="#1a2a0a" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M 192,122 L 216,104" stroke="#5a6672" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="196" cy="128" r="2.5" fill="#5a6672"/>
+  <!-- Head -->
+  <path d="M 128,66 C 168,66 190,92 190,128 C 190,168 166,196 128,196 C 90,196 66,168 66,128 C 66,92 88,66 128,66 Z" fill="url(#skinGrad)" stroke="#1a2a0a" stroke-width="4"/>
+  <!-- Mohawk on the flesh side -->
+  <path d="M 96,76 L 86,54 L 102,70 L 98,46 L 110,67 L 110,42 L 119,66 L 123,46 L 128,68 C 116,67 104,70 96,76 Z" fill="#1c1408" stroke="#0e0a04" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- Steel half of the face -->
+  <path d="M 128,66 C 168,66 190,92 190,128 C 190,168 166,196 128,196 L 134,176 L 126,152 L 134,130 L 126,108 L 134,86 Z" fill="url(#plateGrad)" stroke="#1a2a0a" stroke-width="4" stroke-linejoin="round"/>
+  <g fill="#5a6672">
+    <circle cx="140" cy="92" r="2.5"/>
+    <circle cx="140" cy="130" r="2.5"/>
+    <circle cx="140" cy="170" r="2.5"/>
+  </g>
+  <path d="M 150,72 C 174,80 186,104 186,128" fill="none" stroke="#5a6672" stroke-width="2.5"/>
+  <!-- Circuit on the steel forehead -->
+  <g fill="none" stroke="#38d6e8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M 152,76 L 152,90 L 166,96 M 152,90 L 142,98"/>
+  </g>
+  <g fill="#38d6e8" filter="url(#glow)">
+    <circle cx="152" cy="76" r="3.5"/>
+    <circle cx="166" cy="96" r="3"/>
+  </g>
+  <!-- Flesh brow and eye -->
+  <path d="M 82,108 L 124,118 L 126,108 L 86,98 Z" fill="#2c3c14"/>
+  <path d="M 92,122 C 100,116 114,118 120,126 C 112,132 98,132 92,122 Z" fill="#ffd100" stroke="#1a2a0a" stroke-width="2.5"/>
+  <circle cx="108" cy="125" r="3.5" fill="#1a1006"/>
+  <!-- Steel brow and LED eye -->
+  <path d="M 132,108 L 172,98 L 174,106 L 132,118 Z" fill="#5a6672"/>
+  <circle cx="152" cy="126" r="12" fill="#14121a" stroke="#1a2a0a" stroke-width="3"/>
+  <circle cx="152" cy="126" r="6" fill="#5ef0ff" filter="url(#glow)"/>
+  <!-- Nose -->
+  <path d="M 118,150 Q 124,142 130,146" fill="none" stroke="#2c3c14" stroke-width="4" stroke-linecap="round"/>
+  <!-- Mouth: a lip on the flesh side, a grille on the steel side -->
+  <path d="M 96,170 Q 112,162 130,166" fill="none" stroke="#1a2a0a" stroke-width="5" stroke-linecap="round"/>
+  <g stroke="#2a3038" stroke-width="4" stroke-linecap="round">
+    <line x1="142" y1="160" x2="142" y2="176"/>
+    <line x1="152" y1="158" x2="152" y2="174"/>
+    <line x1="162" y1="156" x2="162" y2="170"/>
+  </g>
+  <!-- Tusks: ivory and steel -->
+  <path d="M 100,170 L 94,144 L 112,166 Z" fill="#f4ecd4" stroke="#1a2a0a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M 174,166 L 172,140 L 164,166 Z" fill="#dfe6ec" stroke="#1a2a0a" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+</svg>
