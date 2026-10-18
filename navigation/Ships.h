@@ -97,9 +97,18 @@ public:
     std::vector<std::string> lines(const GameSnapshot& snapshot, const ShipWatch& watch, std::int64_t wallMs);
 
 private:
-    // By map and name.
-    std::map<std::string, TimePoint> writtenAt_;
-    std::map<std::string, ShipState> stateWritten_;
+    // A ship logged: known by its map and name, and where it was seen last.
+    struct Logged
+    {
+        std::uint32_t mapId = 0;
+        std::string name;
+        Guid guid = 0; // the GUID it was logged under last
+        Vec3 at;
+        std::optional<TimePoint> writtenAt;
+        std::optional<ShipState> state;
+    };
+
+    std::vector<Logged> logged_;
 };
 
 } // namespace og
