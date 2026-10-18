@@ -50,6 +50,7 @@ struct TargetFilterConfig
     // not. Jasperlode Mine's kobolds sit 17-40 yd down at 20-30 yd out.
     float heightAllowance = 3.0f;
     float maxSlope = 0.5f; // rise per yard of level distance, about 27 degrees
+    float aggroRadiusBase = 20.0f; // BotConfig::aggroRadiusBase
     bool attackElites = false;
     // NPC entries known to be elite (rare elite, boss): the 64-bit clients do
     // not say, the quest data does (data/quests/elites.json).
@@ -140,7 +141,7 @@ public:
     // How near a hostile mob comes for us, as in Classic: 20 yards at the same
     // level, a yard more for each level it is above us and less for each below,
     // between 5 and 45.
-    static float aggroRadius(int mobLevel, int playerLevel);
+    static float aggroRadius(int mobLevel, int playerLevel, float base = 20.0f);
     // A hostile mob within a fixed 10 yards ahead along the direction of travel.
     // Not one behind the line of travel (walked away from), above the level range
     // (walked round), an elite when elites are off, one grey to the character,

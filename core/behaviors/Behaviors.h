@@ -881,6 +881,10 @@ private:
     std::vector<std::uint64_t> readOwners_;
     std::vector<std::size_t> rewardsTried_;
     bool rewardClicked_ = false;
+    // The reward clicked, how often, and when Complete Quest was clicked after it.
+    std::optional<std::size_t> picked_;
+    int pickClicks_ = 0;
+    std::optional<TimePoint> completeAt_;
     bool completed_ = false; // Complete Quest clicked
     int progressPanelClicks_ = 0;
     int completeClicks_ = 0;
@@ -891,6 +895,41 @@ private:
     std::optional<TimePoint> questMobsSeenAt_;
     bool questMobsHere_ = false;
     mutable std::set<std::uint32_t> waitSaid_;
+};
+
+struct QuestBuff;
+
+// 660: Questing - a quest whose objectives need a buff from an item it gave
+// (Shhh! We're Hunting Kobolds: the Kobold Tracking Kit's Hunting Kobolds,
+// which shows the Kobold Tracks): the item used - "/use item:<id>", then by
+// its name - whenever the buff is not on. One that gives none is left for a
+// minute.
+class QuestBuffBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "QuestBuff";
+    }
+
+    int priority() const override
+    {
+        return priority::QuestBuff;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+private:
+    const QuestBuff* wanted(const GameSnapshot& s, BotContext& ctx) const;
+    static std::string questName(BotContext& ctx, std::uint32_t questId);
+
+    const QuestBuff* current_ = nullptr;
+    int tries_ = 0;
+    std::optional<TimePoint> usedAt_;
+    std::map<std::uint32_t, TimePoint> retryAt_;
 };
 
 // 470: Questing - an item in bags starts a quest (e.g. Captain Sanders' Treasure
@@ -963,7 +1002,12 @@ public:
 private:
     std::optional<Vec3> from_; // the place left
     std::optional<Vec3> to_;
+    // The other ways out, tried in turn where the one gone for has no way to it.
+    std::vector<Vec3> otherWays_;
     TimePoint startedAt_{};
+    // No way out of it found at all: not tried again at once, every tick.
+    std::optional<Vec3> gaveUpOn_;
+    TimePoint gaveUpUntil_{};
 };
 
 // 440, Train Abilities: on reaching an even level, to the nearest trainer of

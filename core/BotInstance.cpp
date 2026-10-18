@@ -126,7 +126,7 @@ std::vector<AvoidZone> travelMobZones(const GameSnapshot& s, const TargetSelecto
             continue;
         }
 
-        const float reach = TargetSelector::aggroRadius(mob.level > 0 ? mob.level : s.player.level + 10, s.player.level);
+        const float reach = TargetSelector::aggroRadius(mob.level > 0 ? mob.level : s.player.level + 10, s.player.level, targets.config().aggroRadiusBase);
         zones.push_back({mob.position, reach + margin, mob.name, false, AvoidZone::reachOf(reach + margin)});
     }
 
@@ -267,6 +267,7 @@ void BotInstance::refreshTargetFilter()
     TargetFilterConfig filter = filterFromProfile(*profile_);
     filter.blacklistDuration = config_.blacklistDuration;
     filter.skipGrayMobs = config_.skipGrayMobs;
+    filter.aggroRadiusBase = config_.aggroRadiusBase;
     filter.attackElites = filter.attackElites || config_.pullElites;
     filter.eliteEntries = eliteEntries_;
     // A party follower pulls nothing of its own: it fights what the leader does.
@@ -457,11 +458,14 @@ void BotInstance::tick()
 
         navigator_.setMobZones(std::move(mobZones));
         navigator_.setPackZones(std::move(packZones));
+        // Hallow's End's pumpkins and the like, which the map's files have not.
+        navigator_.setObjectZones(context_.objectFootprints && config_.usePathfinding ? context_.objectFootprints->zones(*currentSnapshot) : std::vector<AvoidZone>{});
     }
     else
     {
         navigator_.setMobZones({});
         navigator_.setPackZones({});
+        navigator_.setObjectZones({});
     }
 
     engine_.tick(
@@ -608,9 +612,9 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
     // standing where one of them would notice us is pulled. Not the ones
     // already fought or coming - there is no keeping away from those.
     std::vector<TargetSelector::DangerZone> dangerZones;
-    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now());
+    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 
-    context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now());
+    context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 
     for (const StrongMob& mob : context_.strongMobs.mobs())
     {
@@ -656,7 +660,7 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
             }
 
             const bool allGrey = targets_.packAllGrey(u, s);
-            const float reach = TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level);
+            const float reach = TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level, config_.aggroRadiusBase);
             constexpr float kPackPullMargin = 5.0f;
             if (!allGrey)
             {
@@ -684,7 +688,8 @@ void BotInstance::watchRespawns(const GameSnapshot& s)
 {
     const TimePoint now = clock_->now();
     constexpr Duration kWithin{10000};
-    constexpr Duration kFor{300000};
+    // Not for the rest of the session: half a minute, and the place is as any other.
+    constexpr Duration kFor{30000};
     constexpr float kNear = 20.0f;
     std::erase_if(context_.recentKills, [&](const RecentKill& k) { return now - k.when > kWithin; });
     std::erase_if(context_.fastRespawns, [&](const FastRespawn& f) { return now >= f.until; });
@@ -712,7 +717,7 @@ void BotInstance::watchRespawns(const GameSnapshot& s)
             }
 
             context_.fastRespawns.push_back({k.at, k.entry, k.name, now + kFor});
-            log_.info(logcat::Target, "{} came back {:.0f}s after the kill - what is needed is looted, and the bot leaves the place for {} minutes", k.name, toSeconds(now - k.when), std::chrono::duration_cast<std::chrono::minutes>(kFor).count());
+            log_.info(logcat::Target, "{} came back {:.0f}s after the kill - what is needed is looted, and the bot leaves the place for {:.0f} s", k.name, toSeconds(now - k.when), toSeconds(kFor));
         }
     }
 

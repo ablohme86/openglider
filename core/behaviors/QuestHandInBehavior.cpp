@@ -365,6 +365,9 @@ void QuestHandInBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
     rewards_.clear();
     rewardsTried_.clear();
     rewardClicked_ = false;
+    picked_.reset();
+    pickClicks_ = 0;
+    completeAt_.reset();
     completed_ = false;
     progressPanelClicks_ = 0;
     completeClicks_ = 0;
@@ -1190,6 +1193,50 @@ BehaviorStatus QuestHandInBehavior::chooseReward(const GameSnapshot& s, BotConte
 
     if (rewardClicked_ || shown.empty())
     {
+        // The reward clicked shows as chosen (QuestInfoItemHighlight round it)
+        // before Complete Quest: with a click the client did not take, the
+        // button did nothing, and every reward was tried in turn for nothing.
+        // Where the highlight cannot be read, the click is taken as it is.
+        if (rewardClicked_ && picked_ && *picked_ < shown.size() && !completeAt_)
+        {
+            const UiFrame& item = shown[*picked_];
+            const auto highlight = ctx.provider->uiFrame("QuestInfoItemHighlight");
+            const bool chosen = !highlight || (highlight->visible && highlight->left <= item.centerX() && item.centerX() <= highlight->right && highlight->top <= item.centerY() && item.centerY() <= highlight->bottom);
+
+            if (!chosen && pickClicks_ < 3)
+            {
+                if (clickAt(ctx, item))
+                {
+                    ++pickClicks_;
+                    ctx.log.info(logcat::Profile, "quest mode: the reward does not show as chosen - clicking it again");
+                }
+
+                return BehaviorStatus::Running;
+            }
+        }
+
+        // The server's answer to Complete Quest is waited for before the reward
+        // is taken for one not to be chosen: answered late, the bot had gone
+        // through every reward in turn in the meantime.
+        constexpr Duration kCompleteAnswer{4000};
+
+        if (completeAt_ && now - *completeAt_ < kCompleteAnswer)
+        {
+            return BehaviorStatus::Running;
+        }
+
+        if (completeAt_)
+        {
+            // Still here: that reward was not one to choose; the next.
+            completeAt_.reset();
+
+            if (rewardClicked_)
+            {
+                rewardClicked_ = false;
+                return BehaviorStatus::Running;
+            }
+        }
+
         if (++completeClicks_ > 5)
         {
             completeClicks_ = 0;
@@ -1199,8 +1246,7 @@ BehaviorStatus QuestHandInBehavior::chooseReward(const GameSnapshot& s, BotConte
         // "Complete Quest" - after the reward, or straight away with none to choose.
         if (ctx.clickUiFrame("QuestFrameCompleteQuestButton"))
         {
-            // Still here next step: that reward was not one to choose; try the next.
-            rewardClicked_ = false;
+            completeAt_ = now;
             completed_ = true;
             stageStarted_ = now;
         }
@@ -1332,6 +1378,8 @@ BehaviorStatus QuestHandInBehavior::chooseReward(const GameSnapshot& s, BotConte
     const auto& item = rewards_[*choice];
     ctx.log.info(logcat::Profile, "quest mode: choosing {}{}", item ? item->name : rewardFrame(*choice), item && item->sellPrice >= 0 ? std::format(" (sells for {}c)", item->sellPrice) : "");
     rewardClicked_ = true;
+    picked_ = *choice;
+    pickClicks_ = 0;
     return BehaviorStatus::Running;
 }
 

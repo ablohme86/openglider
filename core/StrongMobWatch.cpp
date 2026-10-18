@@ -50,12 +50,12 @@ Vec3 StrongMob::heading() const
     return position + Vec3{velocity.x / speed * lead, velocity.y / speed * lead, 0.0f};
 }
 
-float StrongMobWatch::aggroRange(int mobLevel, int playerLevel)
+float StrongMobWatch::aggroRange(int mobLevel, int playerLevel, float base)
 {
-    return std::clamp(20.0f + static_cast<float>(mobLevel - playerLevel), 10.0f, 45.0f);
+    return std::clamp(base + static_cast<float>(mobLevel - playerLevel), 5.0f, 45.0f);
 }
 
-void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now)
+void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now, float aggroBase)
 {
     mobs_.clear();
     spotted_.clear();
@@ -128,7 +128,7 @@ void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now)
         {
             continue;
         }
-        mobs_.push_back({u.guid, u.name, u.level, u.position, track.velocity, aggroRange(level, p.level), ours, distance2D(p.position, u.position)});
+        mobs_.push_back({u.guid, u.name, u.level, u.position, track.velocity, aggroRange(level, p.level, aggroBase), ours, distance2D(p.position, u.position)});
     }
 
     std::erase_if(tracks_, [&](const auto& t) { return now - t.second.seenAt > kForget; });

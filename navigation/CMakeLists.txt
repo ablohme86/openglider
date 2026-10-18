@@ -13,6 +13,7 @@ og_add_module(navigation
         Ships.cpp
         Avoidance.cpp
         ClientGeometry.cpp
+        ObjectFootprints.cpp
     DEPS
         og_common
         og_state

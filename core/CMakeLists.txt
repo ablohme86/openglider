@@ -29,6 +29,7 @@ og_add_module(core
         behaviors/FishBehavior.cpp
         behaviors/VendorBehavior.cpp
         behaviors/InventoryQuestBehavior.cpp
+        behaviors/QuestBuffBehavior.cpp
         behaviors/QuestHandInBehavior.cpp
         behaviors/TrainerBehavior.cpp
         behaviors/FlightMasterBehavior.cpp

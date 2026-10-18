@@ -88,6 +88,9 @@ inline constexpr int Hold = 750;
 inline constexpr int Loot = 700;
 // Out of where a mob comes back at once, once its loot is taken (FastRespawn).
 inline constexpr int LeaveRespawn = 690;
+// Quest Buff: the item a quest gives used for the buff its objectives need
+// (the Kobold Tracking Kit), before the objects it shows are gone to.
+inline constexpr int QuestBuff = 660;
 inline constexpr int Gather = 650;
 // Sit down at campfires (WoW Forever): a minute by one for Camp Benefits.
 inline constexpr int Campfire = 610;

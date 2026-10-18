@@ -48,9 +48,9 @@ bool TargetSelector::nameMatches(const std::vector<std::string>& list, const std
     return std::any_of(list.begin(), list.end(), [&](const std::string& n) { return iequals(n, name); });
 }
 
-float TargetSelector::aggroRadius(int mobLevel, int playerLevel)
+float TargetSelector::aggroRadius(int mobLevel, int playerLevel, float base)
 {
-    const float radius = 20.0f + static_cast<float>(mobLevel - playerLevel);
+    const float radius = base + static_cast<float>(mobLevel - playerLevel);
     return std::clamp(radius, 5.0f, 45.0f);
 }
 
@@ -143,7 +143,7 @@ const UnitState* TargetSelector::threatInTheWay(const GameSnapshot& s, std::opti
         // the way goes round is left alone.
         if (d > kPossibleAggroRange && !way.empty())
         {
-            const AvoidZone reach{u.position, aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level), u.name};
+            const AvoidZone reach{u.position, aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level, config_.aggroRadiusBase), u.name};
             bool passes = false;
 
             for (std::size_t i = 0; i + 1 < way.size() && !passes; ++i)
@@ -233,7 +233,7 @@ const UnitState* TargetSelector::standingInTheWay(const GameSnapshot& s, const U
 
         const float aside = std::fabs(toMob.x * dir.y - toMob.y * dir.x);
 
-        if (aside > std::min(kWidest, aggroRadius(u.level, s.player.level)))
+        if (aside > std::min(kWidest, aggroRadius(u.level, s.player.level, config_.aggroRadiusBase)))
         {
             continue;
         }

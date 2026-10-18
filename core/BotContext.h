@@ -33,6 +33,7 @@
 #include "og/core/StrongMobWatch.h"
 #include "og/input/IInputBackend.h"
 #include "og/navigation/Navigator.h"
+#include "og/navigation/ObjectFootprints.h"
 #include "og/navigation/Ships.h"
 #include "og/navigation/WaypointRoute.h"
 #include "og/profiles/GliderProfile.h"
@@ -345,6 +346,10 @@ struct BotContext
     std::shared_ptr<const GameNames> gameNames;
     // The flight paths, from the client's tables, where they could be read.
     std::shared_ptr<const TaxiNetwork> taxiNetwork;
+    // What the game objects about take up on the ground, by their models
+    // (the client's GameObjectDisplayInfo and model files): gone round on the
+    // way. Null where the client's files could not be read.
+    std::shared_ptr<ObjectFootprints> objectFootprints;
     const TaxiNetwork* network() const
     {
         return taxiNetwork.get();
@@ -440,6 +445,7 @@ struct BotContext
     // (either may be empty; case does not matter). The texts are the English
     // client's. Never any other dialog: a group invite or a trade is left alone.
     bool clickDialog(std::string_view textHolds, std::string_view buttonReads = {});
+    TimePoint clickNotMadeSaidAt_{};
     // Moves the mouse until the unit or object is under it, one spot a tick
     // from the middle of the window out, as old Glider found the bobber: for a
     // client whose target cannot be set, a corpse or a herb is then

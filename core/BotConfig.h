@@ -361,6 +361,10 @@ struct BotConfig
     // stepped away from as the mobs too strong to fight are, below.
     bool addAvoidance = true;
     float addAvoidanceMargin = 0.0f; // extra yards added to mob aggro radius for avoidance
+    // How near a mob at the character's own level notices it - a yard more or
+    // less for each level between them. 20 in Classic as the emulators have
+    // it; WoW Forever's mobs notice from 10 (measured), set on attaching.
+    float aggroRadiusBase = 20.0f;
     // On the way somewhere, the way goes round every hostile mob not to be
     // pulled - a quest's mobs are not gone round - by its aggro range and the
     // pack margin. Where there is no way round (a cave, a house), the one in

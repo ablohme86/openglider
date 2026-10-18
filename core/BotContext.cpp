@@ -236,7 +236,7 @@ const UnitState* BotContext::joinsTheFight(const GameSnapshot& s, const UnitStat
 
         const float d = distance2D(spot, u.position);
 
-        if (d > TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level))
+        if (d > TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level, config.aggroRadiusBase))
         {
             continue;
         }
@@ -365,6 +365,19 @@ bool BotContext::uiFrameVisible(std::string_view name)
 
 bool BotContext::clickUiFrame(std::string_view name, MouseButton button)
 {
+    // Why a click was not made, now and then: a Release Spirit that never
+    // came on a Windows client said nothing of it.
+    const auto notClicked = [&](std::string_view why)
+    {
+        if (now() - clickNotMadeSaidAt_ >= Duration(5000))
+        {
+            clickNotMadeSaidAt_ = now();
+            log.warn(logcat::Input, "not clicking {}: {}", name, why);
+        }
+
+        return false;
+    };
+
     // Held back just after a chat line: a click now would be dropped.
     if (!provider || !actions.mouseFree())
     {
@@ -375,14 +388,14 @@ bool BotContext::clickUiFrame(std::string_view name, MouseButton button)
 
     if (!frame || !frame->visible)
     {
-        return false;
+        return notClicked("it is not shown");
     }
 
     const auto size = actions.windowSize();
 
     if (!size)
     {
-        return false;
+        return notClicked("the game window's size is not known");
     }
 
     const int x = static_cast<int>(frame->centerX() * static_cast<float>(size->first) + 0.5f);

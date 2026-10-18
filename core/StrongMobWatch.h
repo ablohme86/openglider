@@ -58,10 +58,11 @@ public:
     static constexpr float kLeadLongest = 25.0f; // yards
 
     // How near a mob so many levels above the character notices it, as in
-    // Classic: 20 yards at its own level and a yard more for each level above.
-    static float aggroRange(int mobLevel, int playerLevel);
+    // Classic: 20 yards at its own level (`base`) and a yard more for each
+    // level above.
+    static float aggroRange(int mobLevel, int playerLevel, float base = 20.0f);
 
-    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now);
+    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now, float aggroBase = 20.0f);
     const std::vector<StrongMob>& mobs() const
     {
         return mobs_;

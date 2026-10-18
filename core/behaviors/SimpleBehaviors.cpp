@@ -43,6 +43,7 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
     out.push_back(std::make_unique<HoldBehavior>());
     out.push_back(std::make_unique<LootBehavior>());
     out.push_back(std::make_unique<LeaveRespawnBehavior>());
+    out.push_back(std::make_unique<QuestBuffBehavior>());
     out.push_back(std::make_unique<GatherBehavior>());
     out.push_back(std::make_unique<CampfireBehavior>());
     out.push_back(std::make_unique<VendorBehavior>());
@@ -477,7 +478,14 @@ bool LeaveRespawnBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
         return !s.isDead() && !s.inCombat() && s.attackers().empty();
     }
 
-    return !s.isDead() && !s.player.isDeadOrGhost() && !s.inCombat() && s.attackers().empty() && leftBehind(s, ctx) != nullptr;
+    const FastRespawn* f = leftBehind(s, ctx);
+
+    if (f && gaveUpOn_ && ctx.now() < gaveUpUntil_ && distance2D(*gaveUpOn_, f->at) < 1.0f)
+    {
+        return false;
+    }
+
+    return !s.isDead() && !s.player.isDeadOrGhost() && !s.inCombat() && s.attackers().empty() && f != nullptr;
 }
 
 void LeaveRespawnBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
@@ -487,39 +495,58 @@ void LeaveRespawnBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
     if (!to_ && f)
     {
         // Straight away from the place, as far again as it reaches, on ground
-        // the map has; another way round where that is not walkable.
+        // the map has; another way round where that is not walkable, then
+        // nearer. In Echo Ridge Mine none of the few ways tried was ground -
+        // rock all round - and the bot stood in the ring saying "nowhere to
+        // go" every tick: where the map has nothing, the pathfinder is asked
+        // for the ways all the same, one after the other.
         Vec3 away = s.player.position - f->at;
         away.z = 0;
         const float length = std::hypot(away.x, away.y);
         const float heading = length > 0.5f ? std::atan2(away.y, away.x) : s.player.heading + kPi;
-        const float reach = FastRespawn::kRadius + 20.0f;
+        std::vector<float> turns{0.0f};
 
-        for (const float turn : {0.0f, 0.6f, -0.6f, 1.2f, -1.2f, 1.8f, -1.8f})
+        for (int i = 1; i <= 6; ++i)
+        {
+            turns.push_back(static_cast<float>(i) * kPi / 6.0f);
+            turns.push_back(-static_cast<float>(i) * kPi / 6.0f);
+        }
+
+        const auto spotAt = [&](float reach, float turn)
         {
             Vec3 spot = f->at + Vec3{std::cos(heading + turn) * reach, std::sin(heading + turn) * reach, 0};
             spot.z = s.player.position.z;
+            return spot;
+        };
+        std::vector<Vec3> ways;
 
-            if (ctx.navigator.provider().usesClientGeometry())
+        if (ctx.navigator.provider().usesClientGeometry())
+        {
+            for (const float reach : {FastRespawn::kRadius + 20.0f, FastRespawn::kRadius + 12.0f, FastRespawn::kRadius + 5.0f})
             {
-                const auto walkable = ctx.navigator.provider().findWalkablePoint(spot, 4.0f, 0.5f);
-
-                if (!walkable)
+                for (const float turn : turns)
                 {
-                    continue;
+                    if (const auto walkable = ctx.navigator.provider().findWalkablePoint(spotAt(reach, turn), 6.0f, 0.5f))
+                    {
+                        ways.push_back(*walkable);
+                    }
                 }
-
-                spot = *walkable;
             }
-
-            to_ = spot;
-            break;
         }
+
+        for (const float turn : turns)
+        {
+            ways.push_back(spotAt(FastRespawn::kRadius + 20.0f, turn));
+        }
+
+        to_ = ways.front();
+        otherWays_.assign(ways.begin() + 1, ways.end());
 
         from_ = f->at;
         startedAt_ = ctx.now();
         // What lies there unlooted stays there.
         std::erase_if(ctx.pendingLoot, [&](const PendingLoot& p) { return !p.inProgress && distance2D(p.position, f->at) <= FastRespawn::kRadius; });
-        ctx.log.info(logcat::Move, "leaving where {} comes back at once - {}", f->name, to_ ? std::format("{:.0f} yd off, to rest there", distance2D(s.player.position, *to_)) : std::string("no ground to go to found"));
+        ctx.log.info(logcat::Move, "leaving where {} comes back at once - {:.0f} yd off, to rest there", f->name, distance2D(s.player.position, *to_));
     }
 
     ctx.combat.defendOnly = true;
@@ -530,17 +557,26 @@ void LeaveRespawnBehavior::onExit(BotContext& ctx)
     // Called away (a fight): looked at afresh from where that leaves the bot.
     to_.reset();
     from_.reset();
+    otherWays_.clear();
     ctx.navigator.stop();
     ctx.combat.defendOnly = false;
 }
 
 BehaviorStatus LeaveRespawnBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 {
-    const auto done = [&](std::string_view why)
+    const auto done = [&](std::string_view why, bool gaveUp = false)
     {
         ctx.log.info(logcat::Move, "away from where it comes back at once: {}", why);
+
+        if (gaveUp && from_)
+        {
+            gaveUpOn_ = from_;
+            gaveUpUntil_ = ctx.now() + Duration(60000);
+        }
+
         to_.reset();
         from_.reset();
+        otherWays_.clear();
         ctx.navigator.stop();
         ctx.combat.defendOnly = false;
         return BehaviorStatus::Success;
@@ -548,12 +584,12 @@ BehaviorStatus LeaveRespawnBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
     if (!to_ || !from_)
     {
-        return done("nowhere to go");
+        return done("nowhere to go", true);
     }
 
     if (ctx.now() - startedAt_ > Duration(40000))
     {
-        return done("it took too long - resting where it got to");
+        return done("it took too long - resting where it got to", true);
     }
 
     const bool clear = s.hostilesNear(s.player.position, 20.0f).empty();
@@ -572,7 +608,16 @@ BehaviorStatus LeaveRespawnBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
     if (status == NavStatus::Unreachable)
     {
-        return done("no way there - resting here");
+        if (!otherWays_.empty())
+        {
+            to_ = otherWays_.front();
+            otherWays_.erase(otherWays_.begin());
+            ctx.navigator.stop();
+            ctx.log.debug(logcat::Move, "leaving where it comes back at once: no way there - trying {}", *to_);
+            return BehaviorStatus::Running;
+        }
+
+        return done("no way out found - resting here", true);
     }
 
     return BehaviorStatus::Running;
