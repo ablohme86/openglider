@@ -97,7 +97,51 @@ enum class DeathDialog
 
 bool clickDeathPopup(BotContext& ctx, DeathDialog dialog)
 {
-    return dialog == DeathDialog::Release ? ctx.clickDialog({}, "Release Spirit") : ctx.clickDialog("resurrect");
+    // The release button as each of the game's languages words it
+    // (DEATH_RELEASE); the corpse's dialog by "resurrect" in its text.
+    static constexpr std::string_view kRelease[] = {"Release Spirit", "Geist freilassen", "Libérer l'esprit", "Liberar espíritu", "Liberar Espírito", "Отпустить дух", "영혼 해방", "释放灵魂", "釋放靈魂"};
+
+    if (dialog == DeathDialog::Release)
+    {
+        for (const std::string_view label : kRelease)
+        {
+            if (ctx.clickDialog({}, label))
+            {
+                return true;
+            }
+        }
+    }
+    else if (ctx.clickDialog("resurrect"))
+    {
+        return true;
+    }
+
+    // Worded some other way: the left button, where both dialogs have theirs
+    // - only on a popup with that one button. The death dialog has a second
+    // (the combat log), and an invite, a duel or a trade one to decline it by.
+    const char* what = dialog == DeathDialog::Release ? "releasing spirit" : "retrieving corpse";
+
+    for (int i = 1; i <= 4; ++i)
+    {
+        const std::string popup = "StaticPopup" + std::to_string(i);
+
+        if (!ctx.uiFrameVisible(popup) || !ctx.uiFrameVisible(popup + "Button1"))
+        {
+            continue;
+        }
+
+        const auto label = ctx.uiText(popup + "Button1", popup + "Button1Text").value_or("?");
+
+        if (!ctx.uiFrameVisible(popup + "Button2"))
+        {
+            ctx.log.info(logcat::Death, "{}: the dialog's left button ('{}')", what, label);
+            return ctx.clickUiFrame(popup + "Button1");
+        }
+
+        ctx.log.info(logcat::Death, "{}: a dialog whose left button reads '{}' - not one known, left alone", what, label);
+    }
+
+    return false;
 }
 
 } // namespace
