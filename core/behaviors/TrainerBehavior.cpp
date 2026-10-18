@@ -539,7 +539,7 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             // warlock training." The greeting above it says "training" too
             // (Maximillian Crowe's "Keep up on your training"): a line of
             // text, not a paragraph.
-            for (std::string_view phrase : {"training", "Training", "train", "Train", "teach"})
+            for (std::string_view phrase : {"training", "Training", "train", "Train", "teach", "訓練", "训练"})
             {
                 for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
                 {

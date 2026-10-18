@@ -213,6 +213,41 @@ std::uint32_t QuestSource::canonicalZone(std::uint32_t zone) const
     return known ? zone : og::canonicalZone(zone);
 }
 
+void QuestSource::useGameNames(const GameNames& names)
+{
+    std::size_t changed = 0;
+    const auto use = [&](std::string& name, const std::optional<std::string>& in)
+    {
+        if (in && !in->empty())
+        {
+            name = *in;
+            ++changed;
+        }
+    };
+
+    for (auto& [id, quest] : quests_)
+    {
+        use(quest.name, names.quest(id));
+    }
+
+    for (auto& [id, name] : npcNames_)
+    {
+        use(name, names.npc(id));
+    }
+
+    for (auto& [id, name] : itemNames_)
+    {
+        use(name, names.item(id));
+    }
+
+    for (auto& [id, name] : objectNames_)
+    {
+        use(name, names.object(id));
+    }
+
+    localized_ = changed > 0;
+}
+
 bool QuestSource::load(const Files& files, MapOfZone mapOfZone, std::string* error)
 {
     std::string dbFile;
@@ -1844,6 +1879,15 @@ std::vector<QuestTarget> QuestSource::targets(const GameSnapshot& s)
                         return line.want;
                     }
                 }
+
+                // In another language the line words the name its own way.
+                for (const auto& line : *tracked)
+                {
+                    if (localized_ && !key.empty() && lower(line.name).find(key) != std::string::npos && line.want > 0)
+                    {
+                        return line.want;
+                    }
+                }
             }
 
             const auto found = s.player.objectiveWanted.find(key);
@@ -1860,6 +1904,16 @@ std::vector<QuestTarget> QuestSource::targets(const GameSnapshot& s)
             for (std::size_t i = 0; tracked && !key.empty() && i < tracked->size(); ++i)
             {
                 if (const std::string line = lower((*tracked)[i].name); line == key || (startsWith && line.starts_with(key + " ")))
+                {
+                    lineKnown[i] = true;
+                    return &(*tracked)[i];
+                }
+            }
+
+            // In another language the line words the name its own way.
+            for (std::size_t i = 0; localized_ && tracked && !key.empty() && i < tracked->size(); ++i)
+            {
+                if (lower((*tracked)[i].name).find(key) != std::string::npos)
                 {
                     lineKnown[i] = true;
                     return &(*tracked)[i];

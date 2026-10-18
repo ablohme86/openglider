@@ -312,7 +312,7 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
     // I can fly."
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        for (const std::string_view phrase : {"ride", "fly", "Fly", "flight", "Flight", "travel"})
+        for (const std::string_view phrase : {"ride", "fly", "Fly", "flight", "Flight", "travel", "飛", "飞"})
         {
             for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
             {

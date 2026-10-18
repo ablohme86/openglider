@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include "og/world/GameNames.h"
 #include "og/core/QuestTargets.h"
 #include "og/world/QuestGivers.h"
 #include "og/world/ZoneBounds.h"
@@ -82,6 +83,10 @@ public:
     using MapOfZone = std::function<std::optional<std::uint32_t>(std::uint32_t zone)>;
 
     bool load(const Files& files, MapOfZone mapOfZone, std::string* error = nullptr);
+    // The game's names in the client's language: quest titles and the names
+    // of NPCs, items and objects as the client shows them, in its quest log,
+    // tracker and windows. Those it has none for stay English.
+    void useGameNames(const GameNames& names);
     bool loadFromDb(const std::filesystem::path& dbPath, MapOfZone mapOfZone, std::string* error = nullptr);
     const std::string* itemName(std::uint32_t itemId) const override;
     // For tests: the files' contents instead.
@@ -215,6 +220,10 @@ private:
     std::unordered_map<std::uint32_t, std::string> npcNames_;
     std::unordered_map<std::uint32_t, float> npcLevels_; // halfway between its min and max level
     std::unordered_map<std::uint32_t, std::string> itemNames_;
+    // Names in another language than the quest data's own (useGameNames): a
+    // tracker line holding a name counts where none is the name itself -
+    // "已殺死 狗頭人勞工", "Koboldarbeiter getötet".
+    bool localized_ = false;
     std::unordered_map<std::uint32_t, std::string> allItemNames_; // item_names.json
     std::unordered_map<std::uint32_t, std::uint32_t> subzones_;   // subzones.json
     // The zone a subzone lies in, by the data; og::canonicalZone's guess where
