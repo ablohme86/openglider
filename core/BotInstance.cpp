@@ -684,7 +684,8 @@ void BotInstance::watchRespawns(const GameSnapshot& s)
 {
     const TimePoint now = clock_->now();
     constexpr Duration kWithin{10000};
-    constexpr Duration kFor{300000};
+    // Not for the rest of the session: half a minute, and the place is as any other.
+    constexpr Duration kFor{30000};
     constexpr float kNear = 20.0f;
     std::erase_if(context_.recentKills, [&](const RecentKill& k) { return now - k.when > kWithin; });
     std::erase_if(context_.fastRespawns, [&](const FastRespawn& f) { return now >= f.until; });
@@ -712,7 +713,7 @@ void BotInstance::watchRespawns(const GameSnapshot& s)
             }
 
             context_.fastRespawns.push_back({k.at, k.entry, k.name, now + kFor});
-            log_.info(logcat::Target, "{} came back {:.0f}s after the kill - what is needed is looted, and the bot leaves the place for {} minutes", k.name, toSeconds(now - k.when), std::chrono::duration_cast<std::chrono::minutes>(kFor).count());
+            log_.info(logcat::Target, "{} came back {:.0f}s after the kill - what is needed is looted, and the bot leaves the place for {:.0f} s", k.name, toSeconds(now - k.when), toSeconds(kFor));
         }
     }
 

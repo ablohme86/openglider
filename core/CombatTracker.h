@@ -20,6 +20,7 @@
 
 #include "og/core/BotContext.h"
 
+#include <optional>
 #include <set>
 
 namespace og
@@ -32,6 +33,7 @@ namespace og
 //   - tracks fight start/end
 //   - drops an engaged target that vanished or got blacklisted
 //   - prunes pending loot that can no longer be looted
+//   - stops an auto-attack left on a mob that is not fighting us
 class CombatTracker
 {
 public:
@@ -48,6 +50,10 @@ public:
 
 private:
     std::set<Guid> fought_;
+    // In combat only through the character's own auto-attack on a target that
+    // is not fighting us: since when, and when the target was last cleared.
+    std::optional<TimePoint> strayAttackSince_;
+    TimePoint strayClearedAt_{};
 };
 
 } // namespace og

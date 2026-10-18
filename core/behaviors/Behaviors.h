@@ -963,7 +963,12 @@ public:
 private:
     std::optional<Vec3> from_; // the place left
     std::optional<Vec3> to_;
+    // The other ways out, tried in turn where the one gone for has no way to it.
+    std::vector<Vec3> otherWays_;
     TimePoint startedAt_{};
+    // No way out of it found at all: not tried again at once, every tick.
+    std::optional<Vec3> gaveUpOn_;
+    TimePoint gaveUpUntil_{};
 };
 
 // 440, Train Abilities: on reaching an even level, to the nearest trainer of

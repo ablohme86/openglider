@@ -43,6 +43,32 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
         ctx.combat.inFight = false;
     }
 
+    // Auto-attack on (weapons out) at a target that is not fighting us - one
+    // the character had when attached, or one the client took after a kill:
+    // the client says in combat for as long as it stays on, and the bot waited
+    // for the fight to end, before looting or anything else, for ever. Its
+    // target cleared (Escape - only with a target, or it opens the game menu)
+    // stops it.
+    constexpr Duration kStrayAttackWait{2000};
+    constexpr Duration kStrayClearEvery{3000};
+    const UnitState* target = s.target();
+    const bool stray = s.inCombat() && attackers.empty() && target && target->guid != ctx.combat.engaged && (!target->isAlive() || target->targetGuid != s.player.guid);
+
+    if (!stray)
+    {
+        strayAttackSince_.reset();
+    }
+    else if (!strayAttackSince_)
+    {
+        strayAttackSince_ = now;
+    }
+    else if (now - *strayAttackSince_ >= kStrayAttackWait && now - strayClearedAt_ >= kStrayClearEvery)
+    {
+        strayClearedAt_ = now;
+        ctx.log.info(logcat::Combat, "in combat with nothing fighting us, auto-attacking {} - clearing the target to stop it", target->name);
+        ctx.actions.execute(actions::TargetClear);
+    }
+
     // Remember everything we are fighting.
     for (const UnitState* u : attackers)
     {
