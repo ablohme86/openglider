@@ -115,6 +115,7 @@ public:
         return true;
     }
     std::optional<float> groundBelow(const Vec3& at) const override;
+    std::optional<bool> underRoof(const Vec3& at) const override;
     std::optional<float> waterSurface(const Vec3& at) const override;
     std::optional<std::uint32_t> areaAt(const Vec3& at) const override;
 

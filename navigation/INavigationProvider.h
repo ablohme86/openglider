@@ -99,6 +99,13 @@ public:
         return std::nullopt;
     }
 
+    // Whether the ground at a point has a roof over it - a house's, a cave's
+    // rock; nullopt where the map does not tell.
+    virtual std::optional<bool> underRoof(const Vec3&) const
+    {
+        return std::nullopt;
+    }
+
     // The height of the water's surface over a point (a lake, a river, the
     // sea); nullopt where there is no water, or the map is not known.
     virtual std::optional<float> waterSurface(const Vec3&) const

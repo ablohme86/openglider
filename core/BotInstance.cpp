@@ -751,13 +751,22 @@ void BotInstance::markUnderRoof(const GameSnapshot& s)
         }
         else
         {
-            // Ground straight over the mob, from a little over its head to a
-            // hill a hundred yards high: the rock over a mine, a cave.
-            // A map tile that cannot be built: not known, so open sky.
+            // The map's own word on it first: something solid over the ground
+            // the mob stands on - a house's roof, a cave's rock. Then ground
+            // straight over the mob, from a little over its head to a hill a
+            // hundred yards high: the rock over a mine, a cave. A map tile that
+            // cannot be built: not known, so open sky.
             try
             {
+                roofed = map.underRoof(u.position).value_or(false);
+
                 for (const float up : {20.0f, 50.0f, 110.0f})
                 {
+                    if (roofed)
+                    {
+                        break;
+                    }
+
                     const auto ground = map.groundBelow({u.position.x, u.position.y, u.position.z + up});
 
                     if (ground && *ground > u.position.z + 6.0f)
