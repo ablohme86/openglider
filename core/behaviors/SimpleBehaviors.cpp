@@ -43,6 +43,7 @@ std::vector<std::unique_ptr<IBotBehavior>> createDefaultBehaviors()
     out.push_back(std::make_unique<HoldBehavior>());
     out.push_back(std::make_unique<LootBehavior>());
     out.push_back(std::make_unique<LeaveRespawnBehavior>());
+    out.push_back(std::make_unique<QuestBuffBehavior>());
     out.push_back(std::make_unique<GatherBehavior>());
     out.push_back(std::make_unique<CampfireBehavior>());
     out.push_back(std::make_unique<VendorBehavior>());

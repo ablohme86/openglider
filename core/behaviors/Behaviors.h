@@ -893,6 +893,41 @@ private:
     mutable std::set<std::uint32_t> waitSaid_;
 };
 
+struct QuestBuff;
+
+// 660: Questing - a quest whose objectives need a buff from an item it gave
+// (Shhh! We're Hunting Kobolds: the Kobold Tracking Kit's Hunting Kobolds,
+// which shows the Kobold Tracks): the item used - "/use item:<id>", then by
+// its name - whenever the buff is not on. One that gives none is left for a
+// minute.
+class QuestBuffBehavior final : public IBotBehavior
+{
+public:
+    std::string_view name() const override
+    {
+        return "QuestBuff";
+    }
+
+    int priority() const override
+    {
+        return priority::QuestBuff;
+    }
+
+    bool canRun(const GameSnapshot& s, BotContext& ctx) override;
+    void onEnter(const GameSnapshot& s, BotContext& ctx) override;
+    BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
+    void onExit(BotContext& ctx) override;
+
+private:
+    const QuestBuff* wanted(const GameSnapshot& s, BotContext& ctx) const;
+    static std::string questName(BotContext& ctx, std::uint32_t questId);
+
+    const QuestBuff* current_ = nullptr;
+    int tries_ = 0;
+    std::optional<TimePoint> usedAt_;
+    std::map<std::uint32_t, TimePoint> retryAt_;
+};
+
 // 470: Questing - an item in bags starts a quest (e.g. Captain Sanders' Treasure
 // Map, Westfall Deed): right-click/use the item, wait for the quest detail
 // window, accept the quest into the quest log. If accepting or opening fails,
