@@ -2014,6 +2014,18 @@ std::filesystem::path WowMemoryStateProvider::installDirectory() const
     return {};
 }
 
+std::string WowMemoryStateProvider::gameLocale() const
+{
+    const auto install = installDirectory();
+
+    if (install.empty())
+    {
+        return "enUS";
+    }
+
+    return textLocaleOf(readTextFile(install / "WTF" / "Config.wtf").value_or(""));
+}
+
 std::vector<ActionBarSlot> WowMemoryStateProvider::readModernActionBars()
 {
     std::vector<ActionBarSlot> bars;

@@ -8,6 +8,7 @@ og_add_module(world
         QuestSource.cpp
         TravelGraph.cpp
         TaxiNetwork.cpp
+        GameNames.cpp
         QuestClusterer.cpp
         QuestScorer.cpp
         WorldModel.cpp

@@ -291,6 +291,13 @@ private:
     // The 64-bit client's action bars, with the keys its WTF bindings give them.
     std::vector<ActionBarSlot> readModernActionBars();
     std::filesystem::path installDirectory() const;
+
+public:
+    // The client's language, from its WTF/Config.wtf (textLocale): enUS where
+    // it cannot be read.
+    std::string gameLocale() const;
+
+private:
     std::uint32_t objectManager() const;
     std::vector<RawObject> enumerateObjects(Guid& localGuid) const;
     bool readUnit(const RawObject& obj, UnitState& unit) const;
