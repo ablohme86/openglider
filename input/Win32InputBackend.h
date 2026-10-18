@@ -61,7 +61,10 @@ protected:
 
 private:
     std::uint32_t processId_;
-    void* hwnd_ = nullptr;
+    // Looked for again while there is none: the window not up yet when
+    // attached, or made anew (the game restarted, the display mode changed).
+    mutable void* hwnd_ = nullptr;
+    mutable std::uint64_t lookedAt_ = 0;
     int mouseX_ = 0;
     int mouseY_ = 0;
 };

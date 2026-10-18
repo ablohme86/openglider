@@ -301,7 +301,7 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
         return BehaviorStatus::Running;
     }
 
-    if (!ctx.movement.face(s.player, npc->position, 0.4f))
+    if (!ctx.turningRound(npc_) && !ctx.movement.face(s.player, npc->position, 0.4f))
     {
         return BehaviorStatus::Running;
     }
@@ -319,7 +319,7 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
             return BehaviorStatus::Running;
         }
 
-        const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : ctx.seekUnderMouse(npc_, s.player, npc->position, 0.9f);
+        const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : ctx.seekNpcTurning(s.player, npc_, npc->position);
 
         if (seek == BotContext::MouseSeek::Searching)
         {
