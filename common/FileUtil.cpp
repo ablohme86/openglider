@@ -206,7 +206,7 @@ std::string textLocaleOf(std::string_view configWtf)
 
     for (std::size_t start = 0; start < configWtf.size();)
     {
-        const auto end = std::min(configWtf.find('\n', start), configWtf.size());
+        const auto end = (std::min)(configWtf.find('\n', start), configWtf.size()); // windows.h's min macro
         // A Windows line's \r is no part of it.
         const auto last = end > start && configWtf[end - 1] == '\r' ? end - 1 : end;
         std::match_results<std::string_view::const_iterator> m;
