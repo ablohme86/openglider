@@ -19,6 +19,7 @@
 #include "og/core/BotContext.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <cmath>
 #include <format>
 
@@ -77,6 +78,37 @@ bool clickAt(BotContext& ctx, const UiFrame& frame)
 }
 
 } // namespace
+
+std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider)
+{
+    const std::initializer_list<std::string_view> flying{"fly", "flight", "flieg", "flug", "voler", "volar", "voar", "полет", "лететь", "날아", "비행", "飛", "飞"};
+    const std::initializer_list<std::string_view> riding{"ride", "travel", "reise", "viaj"};
+    std::vector<UiFrame> found;
+
+    for (const auto& words : {flying, riding})
+    {
+        for (const std::string_view word : words)
+        {
+            for (const UiFrame& line : provider.uiFramesWithText("GossipFrame", word))
+            {
+                // The same line under two of the words: one line.
+                const bool known = std::any_of(found.begin(), found.end(), [&](const UiFrame& f) { return f.top == line.top && f.left == line.left; });
+
+                if (line.visible && line.bottom - line.top < 0.03f && !known)
+                {
+                    found.push_back(line);
+                }
+            }
+        }
+
+        if (!found.empty())
+        {
+            break;
+        }
+    }
+
+    return found;
+}
 
 std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known)
 {
@@ -307,22 +339,51 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         stageAt_ = now;
     }
 
-    // A gossip first, where it has one: the line to fly by - Omusa
-    // Thunderhorn's in Camp Taurajo, "I need a ride.", others' "Show me where
-    // I can fly."
+    // A gossip first, where it has one: the line to fly by.
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        for (const std::string_view phrase : {"ride", "fly", "Fly", "flight", "Flight", "travel", "飛", "飞"})
+        const auto known = flightGossipLines(*ctx.provider);
+
+        if (known.size() == 1 && clickAt(ctx, known.front()))
         {
-            for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
+            gossipChosen_ = true;
+            talkedAt_ = now;
+            return Status::Running;
+        }
+
+        if (known.size() > 1)
+        {
+            ctx.log.info(logcat::Move, "flight: {} of the flight master's gossip lines have a word to fly by", known.size());
+        }
+
+        // None of those words, or more than one line with one: a flight
+        // master's gossip with its greeting and one line under it has that
+        // line to fly by, whatever it says.
+        std::vector<UiFrame> lines;
+
+        for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", ""))
+        {
+            if (line.visible && line.bottom - line.top < 0.03f)
             {
-                if (line.visible && line.bottom - line.top < 0.03f && clickAt(ctx, line))
-                {
-                    gossipChosen_ = true;
-                    talkedAt_ = now;
-                    return Status::Running;
-                }
+                lines.push_back(line);
             }
+        }
+
+        if (!lines.empty() && lines.size() <= 2)
+        {
+            const auto lowest = std::max_element(lines.begin(), lines.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+
+            if (clickAt(ctx, *lowest))
+            {
+                ctx.log.info(logcat::Move, "flight: the flight master's gossip line known by no word - its only line clicked");
+                gossipChosen_ = true;
+                talkedAt_ = now;
+                return Status::Running;
+            }
+        }
+        else if (!lines.empty())
+        {
+            ctx.log.info(logcat::Move, "flight: the flight master's gossip has {} lines and none known to fly by", lines.size());
         }
     }
 

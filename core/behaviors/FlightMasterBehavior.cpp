@@ -16,6 +16,7 @@
  *
  */
 #include "og/core/BotContext.h"
+#include "og/core/TaxiTrip.h"
 #include "og/core/behaviors/Behaviors.h"
 #include <format>
 
@@ -47,6 +48,20 @@ const UnitState* flightMaster(const GameSnapshot& s, Guid guid)
     }
 
     return nullptr;
+}
+
+bool clickAt(BotContext& ctx, const UiFrame& frame)
+{
+    const auto size = ctx.actions.windowSize();
+
+    if (!size || !ctx.actions.mouseFree())
+    {
+        return false;
+    }
+
+    ctx.actions.mouseMove(static_cast<int>(frame.centerX() * static_cast<float>(size->first) + 0.5f), static_cast<int>(frame.centerY() * static_cast<float>(size->second) + 0.5f));
+    ctx.actions.click(MouseButton::Left);
+    return true;
 }
 
 // The flight master's gossip, where it has one: the line that shows the
@@ -247,12 +262,25 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
     const bool lua = ctx.provider && ctx.provider->supportsLua();
 
     // A gossip first, where it has one: the flight line chosen once.
-    if (lua && ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
+    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
     {
-        ctx.runScript(kChooseFlight);
-        gossipChosen_ = true;
-        talkedAt_ = now;
-        return BehaviorStatus::Running;
+        if (lua)
+        {
+            ctx.runScript(kChooseFlight);
+            gossipChosen_ = true;
+            talkedAt_ = now;
+            return BehaviorStatus::Running;
+        }
+
+        if (ctx.provider)
+        {
+            if (const auto known = flightGossipLines(*ctx.provider); known.size() == 1 && clickAt(ctx, known.front()))
+            {
+                gossipChosen_ = true;
+                talkedAt_ = now;
+                return BehaviorStatus::Running;
+            }
+        }
     }
 
     // Talked to, and the "!" still there: once more - after the first, from
@@ -280,7 +308,6 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
     if (lua)
     {
-        gossipChosen_ = false;
         ctx.interactNpc(npc->guid, npc->position);
     }
     else
@@ -323,6 +350,7 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
     ++talks_;
     talkedAt_ = now;
+    gossipChosen_ = false;
     ctx.log.info(logcat::Profile, "learn flight path: talking to {}", npcName_);
     return BehaviorStatus::Running;
 }

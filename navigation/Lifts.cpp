@@ -93,6 +93,7 @@ void LiftWatch::update(const GameSnapshot& snapshot)
     }
 
     const TimePoint now = clock_.now();
+    std::erase_if(seen_, [&](const Seen& s) { return s.mapId != *snapshot.mapId || now - s.seenAt > kGone; });
 
     for (const auto& o : snapshot.objects)
     {

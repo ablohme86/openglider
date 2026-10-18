@@ -316,7 +316,10 @@ BehaviorStatus CombatBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 {
     if (const UnitState* e = s.findUnit(ctx.combat.engaged); e && e->isAlive() && e->isFleeing)
     {
-        fled_ = e->guid;
+        if (const UnitState* f = s.findUnit(fled_); !f || !f->isAlive())
+        {
+            fled_ = e->guid;
+        }
     }
     else if (const UnitState* f = s.findUnit(fled_); !f || !f->isAlive())
     {

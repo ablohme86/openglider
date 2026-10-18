@@ -17,6 +17,8 @@
 #include "og/navigation/Ships.h"
 
 #include <algorithm>
+#include <cmath>
+#include <format>
 
 namespace og
 {
@@ -160,6 +162,141 @@ std::vector<Vec3> ShipWatch::docks(Guid guid) const
                 out.push_back(dock);
             }
         }
+    }
+
+    return out;
+}
+
+std::string ShipLog::header()
+{
+    return "time_ms,map,guid,entry,name,x,y,z,state,player_x,player_y,player_z,distance";
+}
+
+std::vector<std::string> ShipLog::lines(const GameSnapshot& snapshot, const ShipWatch& watch, std::int64_t wallMs)
+{
+    // No map known: not a ship's route, nor its dock, to put down.
+    if (!snapshot.mapId)
+    {
+        return {};
+    }
+
+    const std::uint32_t mapId = *snapshot.mapId;
+    // The ships in sight, each once: the client lists a ship several times,
+    // under other GUIDs at the same place.
+    std::vector<std::vector<const GameObjectState*>> ships;
+
+    for (const auto& o : snapshot.objects)
+    {
+        if (o.kind != GameObjectKind::Ship)
+        {
+            continue;
+        }
+
+        const auto same = std::find_if(ships.begin(), ships.end(), [&](const auto& listed) { return listed[0]->name == o.name && distance(listed[0]->position, o.position) <= kSamePlace; });
+
+        if (same == ships.end())
+        {
+            ships.push_back({&o});
+        }
+        else
+        {
+            same->push_back(&o);
+        }
+    }
+
+    // Each one the ship logged under one of its GUIDs, or else of its name
+    // the one last seen nearest - the GUID is another each time a ship comes
+    // in sight - or else a ship not logged before.
+    std::vector<std::pair<std::size_t, const GameObjectState*>> seen;
+    std::vector<bool> taken(logged_.size(), false);
+    std::vector<std::size_t> unmatched;
+
+    for (std::size_t i = 0; i < ships.size(); ++i)
+    {
+        bool found = false;
+
+        for (std::size_t l = 0; l < logged_.size() && !found; ++l)
+        {
+            for (const GameObjectState* o : ships[i])
+            {
+                if (!taken[l] && logged_[l].mapId == mapId && o->guid == logged_[l].guid)
+                {
+                    taken[l] = true;
+                    seen.emplace_back(l, o);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+        {
+            unmatched.push_back(i);
+        }
+    }
+
+    for (const std::size_t i : unmatched)
+    {
+        const auto& listed = ships[i];
+        const GameObjectState* lowest = *std::min_element(listed.begin(), listed.end(), [](const GameObjectState* a, const GameObjectState* b) { return a->guid < b->guid; });
+        std::optional<std::size_t> nearest;
+
+        for (std::size_t l = 0; l < logged_.size(); ++l)
+        {
+            if (logged_[l].mapId != mapId || logged_[l].name != lowest->name)
+            {
+                continue;
+            }
+
+            if (!taken[l] && (!nearest || distance(logged_[l].at, lowest->position) < distance(logged_[*nearest].at, lowest->position)))
+            {
+                nearest = l;
+            }
+        }
+
+        if (!nearest)
+        {
+            nearest = logged_.size();
+            logged_.push_back({mapId, lowest->name});
+            taken.push_back(false);
+        }
+
+        taken[*nearest] = true;
+        logged_[*nearest].guid = lowest->guid;
+        seen.emplace_back(*nearest, lowest);
+    }
+
+    // On board the player's position is the ship's, not the world's: near
+    // naught, and every ship farther from it than the client sees.
+    const auto& p = snapshot.player.position;
+    const bool aboard = !seen.empty() && std::abs(p.x) <= kAboardWithin && std::abs(p.y) <= kAboardWithin && std::abs(p.z) <= kAboardWithin &&
+                        std::all_of(seen.begin(), seen.end(), [&](const auto& ship) { return distance(p, ship.second->position) > kSight; });
+    std::vector<std::string> out;
+
+    for (const auto& [l, o] : seen)
+    {
+        Logged& ship = logged_[l];
+        ship.at = o->position;
+        const auto state = watch.state(o->guid).value_or(ShipState::Moving);
+        const bool due = !ship.writtenAt || snapshot.timestamp - *ship.writtenAt >= kEvery;
+
+        if (!due && ship.state == state)
+        {
+            continue;
+        }
+
+        ship.writtenAt = snapshot.timestamp;
+        ship.state = state;
+        // A name with a comma or a quote in it, quoted as CSV quotes.
+        std::string name = o->name;
+
+        for (std::size_t q = name.find('"'); q != std::string::npos; q = name.find('"', q + 2))
+        {
+            name.insert(q, 1, '"');
+        }
+
+        const std::string player = aboard ? ",,," : std::format("{:.2f},{:.2f},{:.2f},{:.1f}", p.x, p.y, p.z, distance(p, o->position));
+        out.push_back(std::format("{},{},0x{:016X},{},\"{}\",{:.2f},{:.2f},{:.2f},{},{}", wallMs, mapId, o->guid, o->entry, name, o->position.x, o->position.y, o->position.z, toString(state), player));
     }
 
     return out;

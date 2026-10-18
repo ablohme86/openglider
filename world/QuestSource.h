@@ -159,6 +159,11 @@ private:
         // destroy - one object for every one of its name, and how many.
         std::vector<std::uint32_t> use;
         std::vector<int> useCounts;
+        std::string englishName;
+        const std::string& originalName() const
+        {
+            return englishName.empty() ? name : englishName;
+        }
     };
     struct Spawn
     {
