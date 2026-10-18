@@ -191,6 +191,11 @@ struct ModernLayout
     // Fishing: who cast a bobber, and the byte that turns 1 while a fish bites.
     // 0 until probed (with a fishing probe); the bot cannot fish without the bite.
     std::uint32_t gameObjectCreatedBy = 0; // GUID128
+    // The model the cache entry (gameObjectNameCache) gives a game object -
+    // GameObjectDisplayInfo's ID - and the object's own scale (a float, 1
+    // for most). 0: unknown, and no object is gone round by its model.
+    std::uint32_t gameObjectCacheDisplayId = 0;
+    std::uint32_t gameObjectScale = 0;
     std::uint32_t gameObjectBobbing = 0;   // u8 state
     // u8, the low byte of GAMEOBJECT_BYTES_1: 1 ready, 0 used. A gathered herb
     // or vein, or an emptied chest, stays in the client for half a minute or so.

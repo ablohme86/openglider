@@ -2032,14 +2032,29 @@ bool ModernClientReader::readGameObject(const Object& obj, GameObjectState& g) c
     g.name = cachedName(g.guid, obj.base, L_.gameObjectNameCache, L_.gameObjectCacheName);
     std::uint8_t type = c::GoTypeChest;
 
-    if (L_.hasGameObjectCacheType)
+    if (L_.hasGameObjectCacheType || L_.gameObjectCacheDisplayId)
     {
         const auto entry = memory_.read<std::uint64_t>(obj.base + L_.gameObjectNameCache).value_or(0);
 
         if (isPointer(entry))
         {
-            type = static_cast<std::uint8_t>(memory_.read<std::uint32_t>(entry + L_.gameObjectCacheType).value_or(c::GoTypeGeneric));
+            if (L_.hasGameObjectCacheType)
+            {
+                type = static_cast<std::uint8_t>(memory_.read<std::uint32_t>(entry + L_.gameObjectCacheType).value_or(c::GoTypeGeneric));
+            }
+
+            if (L_.gameObjectCacheDisplayId)
+            {
+                g.displayId = memory_.read<std::uint32_t>(entry + L_.gameObjectCacheDisplayId).value_or(0);
+            }
         }
+    }
+
+    // A pumpkin set out for Hallow's End at half size says so here (0.5).
+    if (L_.gameObjectScale)
+    {
+        const float scale = memory_.read<float>(obj.base + L_.gameObjectScale).value_or(1.0f);
+        g.scale = std::isfinite(scale) && scale > 0.01f && scale < 100.0f ? scale : 1.0f;
     }
 
     g.kind = classifyGameObject(type, g.name);

@@ -457,11 +457,14 @@ void BotInstance::tick()
 
         navigator_.setMobZones(std::move(mobZones));
         navigator_.setPackZones(std::move(packZones));
+        // Hallow's End's pumpkins and the like, which the map's files have not.
+        navigator_.setObjectZones(context_.objectFootprints && config_.usePathfinding ? context_.objectFootprints->zones(*currentSnapshot) : std::vector<AvoidZone>{});
     }
     else
     {
         navigator_.setMobZones({});
         navigator_.setPackZones({});
+        navigator_.setObjectZones({});
     }
 
     engine_.tick(

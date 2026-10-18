@@ -123,6 +123,20 @@ public:
         sway_ = yards;
     }
 
+    // What the server has put in the world that the map's files have not -
+    // Hallow's End's pumpkins, a mailbox, an anvil - round its model's
+    // collision (ObjectFootprints). Gone round on the way, never in the way
+    // of setting out or of arriving: a vendor stands beside a pumpkin.
+    void setObjectZones(std::vector<AvoidZone> zones)
+    {
+        objectZones_ = std::move(zones);
+    }
+
+    const std::vector<AvoidZone>& objectZones() const
+    {
+        return objectZones_;
+    }
+
     // How far out from a wall the way may go round it (NavigatorConfig::wallClearance).
     void setWallClearance(float yards)
     {
@@ -295,6 +309,14 @@ private:
             }
         }
 
+        for (const auto& z : objectZones_)
+        {
+            if (distance2D(from, z.center) > z.radius + kObjectApproach && distance2D(to, z.center) > z.radius + kObjectApproach)
+            {
+                result.push_back(z);
+            }
+        }
+
         return result;
     }
 
@@ -330,6 +352,9 @@ private:
     std::optional<Vec3> keptSidesTo_;
     std::vector<AvoidZone> mobZones_;
     std::vector<AvoidZone> packZones_;
+    std::vector<AvoidZone> objectZones_;
+    // Closer than this to an object's edge, the way to or from it goes straight.
+    static constexpr float kObjectApproach = 3.0f;
     bool pathPastMobs_ = false;           // no way round them: the path goes past them, and stays
     int orbitsSeen_ = 0;                  // the movement's orbits already dealt with
     std::optional<TimePoint> hoverSince_; // since when right by path point hoverIndex_

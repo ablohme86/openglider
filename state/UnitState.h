@@ -437,6 +437,10 @@ struct GameObjectState
     Guid createdBy = 0;     // e.g. owner of a fishing bobber
     bool isBobbing = false; // fishing bobber "bite" animation
     bool canInteract = true;
+    // Its model (GameObjectDisplayInfo's ID; 0 unknown) and scale: what it
+    // takes up on the ground, for the way round it.
+    std::uint32_t displayId = 0;
+    float scale = 1.0f;
 };
 
 struct FishingState
