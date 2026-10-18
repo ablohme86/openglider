@@ -38,7 +38,8 @@ std::optional<std::pair<int, int>> Win32InputBackend::windowSize()
 {
     RECT rc{};
 
-    if (!hwnd_ || !GetClientRect(static_cast<HWND>(hwnd_), &rc) || rc.right <= rc.left || rc.bottom <= rc.top)
+    // The window looked for again where there is none yet (isConnected).
+    if (!isConnected() || !GetClientRect(static_cast<HWND>(hwnd_), &rc) || rc.right <= rc.left || rc.bottom <= rc.top)
     {
         return std::nullopt;
     }

@@ -69,8 +69,12 @@ inline BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)
 
     char cls[128] = {};
     GetClassNameA(hwnd, cls, sizeof(cls));
-    // WoW's main window class is "GxWindowClassD3d" (Direct3D) or "GxWindowClass" (OpenGL).
-    const bool classMatch = std::string(cls).rfind("GxWindowClass", 0) == 0;
+    // WoW's main window class is "GxWindowClassD3d" (Direct3D) or "GxWindowClass" (OpenGL)
+    // on the older clients, "waApplication Window" on the 64-bit ones - whose
+    // title is the game's name in the client's language (魔獸世界), so the
+    // class is what finds it. Keys reach the game through any of its windows;
+    // a click needs the one it draws in.
+    const bool classMatch = std::string(cls).rfind("GxWindowClass", 0) == 0 || std::string(cls) == "waApplication Window";
     char title[256] = {};
     GetWindowTextA(hwnd, title, sizeof(title));
     const bool titleMatch = q->titleContains && *q->titleContains && std::string(title).find(q->titleContains) != std::string::npos;

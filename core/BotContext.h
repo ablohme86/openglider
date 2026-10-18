@@ -445,6 +445,7 @@ struct BotContext
     // (either may be empty; case does not matter). The texts are the English
     // client's. Never any other dialog: a group invite or a trade is left alone.
     bool clickDialog(std::string_view textHolds, std::string_view buttonReads = {});
+    TimePoint clickNotMadeSaidAt_{};
     // Moves the mouse until the unit or object is under it, one spot a tick
     // from the middle of the window out, as old Glider found the bobber: for a
     // client whose target cannot be set, a corpse or a herb is then
