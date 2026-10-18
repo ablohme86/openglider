@@ -126,7 +126,7 @@ std::vector<AvoidZone> travelMobZones(const GameSnapshot& s, const TargetSelecto
             continue;
         }
 
-        const float reach = TargetSelector::aggroRadius(mob.level > 0 ? mob.level : s.player.level + 10, s.player.level);
+        const float reach = TargetSelector::aggroRadius(mob.level > 0 ? mob.level : s.player.level + 10, s.player.level, targets.config().aggroRadiusBase);
         zones.push_back({mob.position, reach + margin, mob.name, false, AvoidZone::reachOf(reach + margin)});
     }
 
@@ -267,6 +267,7 @@ void BotInstance::refreshTargetFilter()
     TargetFilterConfig filter = filterFromProfile(*profile_);
     filter.blacklistDuration = config_.blacklistDuration;
     filter.skipGrayMobs = config_.skipGrayMobs;
+    filter.aggroRadiusBase = config_.aggroRadiusBase;
     filter.attackElites = filter.attackElites || config_.pullElites;
     filter.eliteEntries = eliteEntries_;
     // A party follower pulls nothing of its own: it fights what the leader does.
@@ -611,9 +612,9 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
     // standing where one of them would notice us is pulled. Not the ones
     // already fought or coming - there is no keeping away from those.
     std::vector<TargetSelector::DangerZone> dangerZones;
-    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now());
+    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 
-    context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now());
+    context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 
     for (const StrongMob& mob : context_.strongMobs.mobs())
     {
@@ -659,7 +660,7 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
             }
 
             const bool allGrey = targets_.packAllGrey(u, s);
-            const float reach = TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level);
+            const float reach = TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level, config_.aggroRadiusBase);
             constexpr float kPackPullMargin = 5.0f;
             if (!allGrey)
             {

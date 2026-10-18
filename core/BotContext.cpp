@@ -236,7 +236,7 @@ const UnitState* BotContext::joinsTheFight(const GameSnapshot& s, const UnitStat
 
         const float d = distance2D(spot, u.position);
 
-        if (d > TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level))
+        if (d > TargetSelector::aggroRadius(u.level > 0 ? u.level : s.player.level + 10, s.player.level, config.aggroRadiusBase))
         {
             continue;
         }
