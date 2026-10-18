@@ -78,11 +78,18 @@ private:
 
 // The ships' and zeppelins' positions as CSV lines, once a second each and at
 // every change of state: their routes, docks and timetables measured, for
-// travel between the continents.
+// travel between the continents. Each ship once, known by its map and name;
+// the player's columns left empty on board, where its position is the ship's.
 class ShipLog
 {
 public:
     static constexpr Duration kEvery{1000};
+    // One ship listed twice: the same name this close.
+    static constexpr float kSamePlace = 1.0f;
+    // On board: the player's position this near naught, and every ship
+    // farther from it than the client sees.
+    static constexpr float kAboardWithin = 50.0f;
+    static constexpr float kSight = 1500.0f;
 
     // The line naming the columns.
     static std::string header();
@@ -90,8 +97,9 @@ public:
     std::vector<std::string> lines(const GameSnapshot& snapshot, const ShipWatch& watch, std::int64_t wallMs);
 
 private:
-    std::map<Guid, TimePoint> writtenAt_;
-    std::map<Guid, ShipState> stateWritten_;
+    // By map and name.
+    std::map<std::string, TimePoint> writtenAt_;
+    std::map<std::string, ShipState> stateWritten_;
 };
 
 } // namespace og
