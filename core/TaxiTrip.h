@@ -38,6 +38,14 @@ class BotContext;
 // the nearest. nullopt where `target`'s button is not the one nearest it.
 std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known);
 
+// The lines to fly by in a flight master's gossip - "Show me where I can
+// fly.", Omusa Thunderhorn's "I need a ride.", in the game's other languages
+// too: the GossipFrame's one-line texts with a word for flying, or, where none
+// has one, with a word for a ride or travelling ("Greetings, traveler." has
+// one). Only one of them is the line to click: with more, a quest's title with
+// "ride" in it may be one of them.
+std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider);
+
 class TaxiTrip
 {
 public:

@@ -16,6 +16,7 @@
  *
  */
 #include "og/core/BotContext.h"
+#include "og/core/TaxiTrip.h"
 #include "og/core/behaviors/Behaviors.h"
 #include <format>
 
@@ -273,17 +274,11 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
 
         if (ctx.provider)
         {
-            for (const std::string_view phrase : {"ride", "fly", "flight", "travel", "flieg", "flug", "reise", "voler", "volar", "voar", "viaj", "полет", "лететь", "날아", "비행", "飛", "飞"})
+            if (const auto known = flightGossipLines(*ctx.provider); known.size() == 1 && clickAt(ctx, known.front()))
             {
-                for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
-                {
-                    if (line.visible && line.bottom - line.top < 0.03f && clickAt(ctx, line))
-                    {
-                        gossipChosen_ = true;
-                        talkedAt_ = now;
-                        return BehaviorStatus::Running;
-                    }
-                }
+                gossipChosen_ = true;
+                talkedAt_ = now;
+                return BehaviorStatus::Running;
             }
         }
     }

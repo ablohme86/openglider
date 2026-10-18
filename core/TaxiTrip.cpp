@@ -19,6 +19,7 @@
 #include "og/core/BotContext.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <cmath>
 #include <format>
 
@@ -77,6 +78,37 @@ bool clickAt(BotContext& ctx, const UiFrame& frame)
 }
 
 } // namespace
+
+std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider)
+{
+    const std::initializer_list<std::string_view> flying{"fly", "flight", "flieg", "flug", "voler", "volar", "voar", "полет", "лететь", "날아", "비행", "飛", "飞"};
+    const std::initializer_list<std::string_view> riding{"ride", "travel", "reise", "viaj"};
+    std::vector<UiFrame> found;
+
+    for (const auto& words : {flying, riding})
+    {
+        for (const std::string_view word : words)
+        {
+            for (const UiFrame& line : provider.uiFramesWithText("GossipFrame", word))
+            {
+                // The same line under two of the words: one line.
+                const bool known = std::any_of(found.begin(), found.end(), [&](const UiFrame& f) { return f.top == line.top && f.left == line.left; });
+
+                if (line.visible && line.bottom - line.top < 0.03f && !known)
+                {
+                    found.push_back(line);
+                }
+            }
+        }
+
+        if (!found.empty())
+        {
+            break;
+        }
+    }
+
+    return found;
+}
 
 std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known)
 {
@@ -307,27 +339,26 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         stageAt_ = now;
     }
 
-    // A gossip first, where it has one: the line to fly by - Omusa
-    // Thunderhorn's in Camp Taurajo, "I need a ride.", others' "Show me where
-    // I can fly." - in the game's other languages too: "Zeigt mir, wohin ich
-    // fliegen kann.", "Montrez-moi où je peux voler." ...
+    // A gossip first, where it has one: the line to fly by.
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        for (const std::string_view phrase : {"ride", "fly", "flight", "travel", "flieg", "flug", "reise", "voler", "volar", "voar", "viaj", "полет", "лететь", "날아", "비행", "飛", "飞"})
+        const auto known = flightGossipLines(*ctx.provider);
+
+        if (known.size() == 1 && clickAt(ctx, known.front()))
         {
-            for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
-            {
-                if (line.visible && line.bottom - line.top < 0.03f && clickAt(ctx, line))
-                {
-                    gossipChosen_ = true;
-                    talkedAt_ = now;
-                    return Status::Running;
-                }
-            }
+            gossipChosen_ = true;
+            talkedAt_ = now;
+            return Status::Running;
         }
 
-        // None of those words: a flight master's gossip with its greeting and
-        // one line under it has that line to fly by, whatever it says.
+        if (known.size() > 1)
+        {
+            ctx.log.info(logcat::Move, "flight: {} of the flight master's gossip lines have a word to fly by", known.size());
+        }
+
+        // None of those words, or more than one line with one: a flight
+        // master's gossip with its greeting and one line under it has that
+        // line to fly by, whatever it says.
         std::vector<UiFrame> lines;
 
         for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", ""))
