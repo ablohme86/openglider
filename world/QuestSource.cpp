@@ -2046,7 +2046,10 @@ std::vector<QuestTarget> QuestSource::targets(const GameSnapshot& s)
             line = line ? line : lineNaming(name != objectNames_.end() ? name->second : "");
             const int logCount = (q.kill.empty() && q.items.empty() && progress != s.player.questProgress.end() && k < progress->kills.size()) ? progress->kills[k] : 0;
             const int wanted = line && line->want > 0 ? line->want : (k < q.useCounts.size() ? q.useCounts[k] : 0);
-            const int used = line ? (line->have > 0 ? line->have : std::max(line->have, logCount)) : logCount;
+            // The tracker's count while it shows the line: the log's first
+            // counter is another objective's where the game has one the data
+            // lacks (Shhh! We're Hunting Kobolds: 1 there, 0/6 tracks followed).
+            const int used = line ? (line->shown || line->have > 0 ? line->have : std::max(line->have, logCount)) : logCount;
             target.progress.push_back(describe(name != objectNames_.end() ? name->second : (line ? line->name : "object"), used, wanted));
 
             if (wanted != 0 && used >= wanted)

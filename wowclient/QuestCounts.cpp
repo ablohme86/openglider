@@ -71,6 +71,12 @@ static std::string normalizeQuestTitle(std::string text)
 {
     text = lower(trimmed(plainChatText(text)));
 
+    // The quest's level before its name where the client shows it - WoW
+    // Forever's tracker: "[10] Protect the Frontier", "[10E]", "[60+]". The
+    // quest's own name has none, and no tracked quest was found by its title.
+    static const std::regex level(R"(^\[\d+[^\]]{0,3}\]\s*)");
+    text = std::regex_replace(text, level, "", std::regex_constants::format_first_only);
+
     // "(Complete)" after a quest done, in the client's language.
     for (const std::string_view done : {" (complete)", " (completed)", "(完成)", " (完成)", "(已完成)", " (abgeschlossen)", " (terminée)", " (completa)", " (completada)", " (completo)", " (выполнено)", " (완료)"})
     {
@@ -172,7 +178,10 @@ std::map<std::string, std::vector<ObjectiveCount>> trackedQuests(const std::vect
 
     for (const auto& t : texts)
     {
-        if (t.bottom > 0 && t.text.starts_with("|cffffd100") && !parseObjectiveCount(t.text))
+        // In whatever colour the quest's difficulty gives it: grey for one far
+        // below the character ("Shhh! We're Hunting Kobolds" at level 4) was
+        // not taken for a title, and its objectives were no one's.
+        if (t.bottom > 0 && t.text.starts_with("|cff") && !parseObjectiveCount(t.text))
         {
             titles.push_back(&t);
         }
