@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/openglider.svg" alt="OpenGlider" width="200">
+</p>
+
 # OpenGlider
 
 OpenGlider is a modular bot engine for World of Warcraft clients, written in
