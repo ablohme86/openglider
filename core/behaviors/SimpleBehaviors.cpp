@@ -1616,9 +1616,14 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
     // waited for him. The client has the mob itself, through the ground: one
     // of a quest's mobs in sight on another level is gone to where it stands,
     // and Pathfinder finds the way down (or up) to it. Pull leaves a mob that
-    // far above or below alone until then.
+    // far above or below alone until then. Another level is what Pull calls
+    // too steep: a Kobold Worker 7 yd up the hillside 60 yd off is on the
+    // same ground, and with another 6 yd down the other way the bot turned
+    // from one to the other for minutes. Not beyond the mob scan range either:
+    // what Pull would not take from here is not gone for.
     constexpr float kOtherLevel = 6.0f;
     constexpr float kSightAcross = 80.0f;
+    const float sightAcross = std::min(kSightAcross, ctx.targets.config().maxDistance);
     std::erase_if(questMobNoWay_, [&](const auto& m) { return now - m.second > kLeaveFor; });
 
     if (ctx.config.usePathfinding && ctx.navigator.provider().usesClientGeometry())
@@ -1647,7 +1652,7 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
                     continue;
                 }
 
-                if (std::fabs(u.position.z - pos.z) < kOtherLevel || distance2D(u.position, pos) > kSightAcross || (ctx.obstacles && ctx.obstacles->avoids(u.position)) || ctx.dangerAt(u.position))
+                if (std::fabs(u.position.z - pos.z) < kOtherLevel || !ctx.targets.tooSteep(u, s) || distance2D(u.position, pos) > sightAcross || (ctx.obstacles && ctx.obstacles->avoids(u.position)) || ctx.dangerAt(u.position))
                 {
                     continue;
                 }

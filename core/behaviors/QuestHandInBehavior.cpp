@@ -654,7 +654,7 @@ BehaviorStatus QuestHandInBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return leave(ctx, "talking to " + quest_->handInTo + " opened nothing", true);
         }
 
-        if (!ctx.movement.face(s.player, npc->position, 0.4f))
+        if (!ctx.turningRound(npc_) && !ctx.movement.face(s.player, npc->position, 0.4f))
         {
             --opens_;
             return BehaviorStatus::Running;
@@ -674,7 +674,7 @@ BehaviorStatus QuestHandInBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             }
 
             const UnitState* npcUnit = s.findUnit(npc_);
-            const auto seek = useTarget || mouseTried_ ? BotContext::MouseSeek::Unsupported : (npcUnit ? ctx.seekUnderMouse(npc_, s.player, npcUnit->position, 0.9f) : ctx.seekUnderMouse(npc_));
+            const auto seek = useTarget || mouseTried_ ? BotContext::MouseSeek::Unsupported : (npcUnit ? ctx.seekNpcTurning(s.player, npc_, npcUnit->position) : ctx.seekUnderMouse(npc_));
 
             if (seek == BotContext::MouseSeek::Searching)
             {

@@ -484,10 +484,17 @@ struct BotContext
             turnFirstSeek_ = now();
         }
     }
+    // seekUnderMouse for an NPC to talk to (a vendor, a trainer, a quest's
+    // NPC, a flight master), and where the mouse finds it nowhere: the
+    // character turns a little either way of facing it, and the mouse looks
+    // again at each - what stood in the way from where the camera was is not
+    // any more. NotFound once every turn was tried (the caller falls back on
+    // the interact key); Found starts the next talk to it afresh.
+    MouseSeek seekNpcTurning(const PlayerState& player, Guid guid, const Vec3& npcPos, float zOffset = 0.9f);
     // While it turns round for `guid`: the caller leaves the facing alone.
     bool turningRound(Guid guid) const
     {
-        return guid != 0 && guid == turnGuid_ && turnStep_ > 0;
+        return guid != 0 && ((guid == turnGuid_ && turnStep_ > 0) || (guid == npcTurnGuid_ && npcTurnStep_ > 0 && npcTurnStep_ <= kNpcTurnSteps));
     }
 
     Guid turnGuid_ = 0;
@@ -499,11 +506,27 @@ struct BotContext
     std::optional<Vec3> turnTargetPos_;
     float turnZOffset_ = 0.15f;
     SeekSpots turnSpotsCache_;
+    bool turnZoomTried_ = false;
+    static constexpr int kNpcTurnSteps = 4;
+    Guid npcTurnGuid_ = 0;
+    TimePoint npcTurnLastSeek_{};
+    TimePoint npcTurnStepSince_{};
+    int npcTurnStep_ = 0; // 0: facing it; then each of the turns aside; past them: tried
+    bool npcTurnLooking_ = false;
+    bool npcTurnZoomTried_ = false;
     // The camera all the way in for a right-click under the mouse that keeps
     // doing nothing: asked before each click with the clicks already made at
     // the corpse or node. True while the camera is on its way in - the caller
     // waits. Only where the client says what is under the mouse.
     bool zoomInForClick(int clicksMade);
+    // The camera all the way in before turning round for something the mouse
+    // does not find: from closer, what stood in the way most often does not.
+    // True when it went in just now - the mouse looks again straight on; false
+    // where it is in already or cannot go.
+    bool zoomInBeforeTurning();
+    // ... and back out once that did not find it either: turned round, the
+    // character's surroundings show from farther off.
+    void zoomOutToTurn();
     // The camera back out to where zoomInForClick() found it: when the corpse
     // or node is done with, or given up on.
     void restoreCamera();

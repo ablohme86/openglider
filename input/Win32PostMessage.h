@@ -46,6 +46,10 @@ struct FindWindowQuery
     DWORD processId = 0; // 0 = any process
     const char* titleContains = "World of Warcraft";
     HWND result = nullptr;
+    // The process's own visible main window, where neither class nor title
+    // says WoW: a Taiwanese client is titled 魔獸世界, and GetWindowTextA has
+    // no English to find in it.
+    HWND fallback = nullptr;
 };
 
 inline BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)
@@ -77,6 +81,13 @@ inline BOOL CALLBACK enumWindowsProc(HWND hwnd, LPARAM lParam)
         return FALSE;
     }
 
+    RECT rc{};
+
+    if (q->processId != 0 && !q->fallback && IsWindowVisible(hwnd) && !GetWindow(hwnd, GW_OWNER) && GetClientRect(hwnd, &rc) && rc.right > rc.left && rc.bottom > rc.top)
+    {
+        q->fallback = hwnd;
+    }
+
     return TRUE;
 }
 
@@ -86,7 +97,7 @@ inline HWND findGameWindow(DWORD processId = 0, const char* titleContains = "Wor
     q.processId = processId;
     q.titleContains = titleContains;
     EnumWindows(enumWindowsProc, reinterpret_cast<LPARAM>(&q));
-    return q.result;
+    return q.result ? q.result : q.fallback;
 }
 
 // `repeat`: a key-down sent again while the key is held (autorepeat), which

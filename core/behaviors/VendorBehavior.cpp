@@ -1126,7 +1126,7 @@ BehaviorStatus VendorBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return merchantNeverOpened(s, ctx);
         }
 
-        if (!ctx.movement.face(s.player, v->position, 0.4f))
+        if (!ctx.turningRound(vendor_) && !ctx.movement.face(s.player, v->position, 0.4f))
         {
             return BehaviorStatus::Running;
         }
@@ -1146,7 +1146,7 @@ BehaviorStatus VendorBehavior::tick(const GameSnapshot& s, BotContext& ctx)
                 return BehaviorStatus::Running;
             }
 
-            const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : (v ? ctx.seekUnderMouse(vendor_, s.player, v->position, 0.9f) : ctx.seekUnderMouse(vendor_));
+            const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : (v ? ctx.seekNpcTurning(s.player, vendor_, v->position) : ctx.seekUnderMouse(vendor_));
 
             if (seek == BotContext::MouseSeek::Searching)
             {

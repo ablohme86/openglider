@@ -403,7 +403,7 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         return Status::Running;
     }
 
-    if (!ctx.movement.face(s.player, master->position, 0.4f))
+    if (!ctx.turningRound(master_) && !ctx.movement.face(s.player, master->position, 0.4f))
     {
         return Status::Running;
     }
@@ -421,7 +421,7 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
             return Status::Running;
         }
 
-        const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : ctx.seekUnderMouse(master_, s.player, master->position, 0.9f);
+        const auto seek = mouseTried_ ? BotContext::MouseSeek::Unsupported : ctx.seekNpcTurning(s.player, master_, master->position);
 
         if (seek == BotContext::MouseSeek::Searching)
         {

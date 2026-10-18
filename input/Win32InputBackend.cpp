@@ -48,7 +48,19 @@ std::optional<std::pair<int, int>> Win32InputBackend::windowSize()
 
 bool Win32InputBackend::isConnected() const
 {
-    return hwnd_ && IsWindow(static_cast<HWND>(hwnd_));
+    if (hwnd_ && IsWindow(static_cast<HWND>(hwnd_)))
+    {
+        return true;
+    }
+
+    // Once a second at most: every action asks.
+    if (const std::uint64_t now = GetTickCount64(); now - lookedAt_ >= 1000)
+    {
+        lookedAt_ = now;
+        hwnd_ = win32::findGameWindow(processId_);
+    }
+
+    return hwnd_ != nullptr;
 }
 
 void Win32InputBackend::doKeyDown(Key key)

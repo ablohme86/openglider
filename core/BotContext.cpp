@@ -24,6 +24,7 @@
 #include "og/actions/ActionBinding.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <string>
@@ -634,6 +635,7 @@ BotContext::MouseSeek BotContext::seekTurningRound(const PlayerState& player, Gu
         turnFirstSeek_ = at;
         turnStep_ = 0;
         turnSpotsCache_.clear();
+        turnZoomTried_ = false;
         turnTargetPos_ = targetPos;
         turnZOffset_ = zOffset;
     }
@@ -653,6 +655,12 @@ BotContext::MouseSeek BotContext::seekTurningRound(const PlayerState& player, Gu
 
     if (turnStep_ == 0)
     {
+        // The camera on its way in: looked for again once it is there.
+        if (cameraZoomedIn_ && at < cameraSettledAt_)
+        {
+            return MouseSeek::Searching;
+        }
+
         const SeekSpots* spotsPtr = nullptr;
         if (turnTargetPos_)
         {
@@ -670,11 +678,28 @@ BotContext::MouseSeek BotContext::seekTurningRound(const PlayerState& player, Gu
             return seek;
         }
 
+        // Zoomed in first, and the same while straight on again before turning;
+        // that no good either, back out to turn round.
+        if (!std::exchange(turnZoomTried_, true) && zoomInBeforeTurning())
+        {
+            turnFirstSeek_ = at;
+            turnSpotsCache_.clear();
+            return MouseSeek::Searching;
+        }
+
+        zoomOutToTurn();
         turnFrom_ = player.heading;
         turnStep_ = 1;
         turnStepSince_ = at;
         stopMouseSeek();
         log.info(logcat::Input, "not got hold of it in {:.0f} s - turning round once to find it under the mouse", toSeconds(at - turnFirstSeek_));
+    }
+
+    // The camera on its way out: the turn's wait runs from when it is there.
+    if (at < cameraSettledAt_)
+    {
+        turnStepSince_ = at;
+        return MouseSeek::Searching;
     }
 
     // A turn that does not come about (the keys held back) is not waited on:
@@ -711,6 +736,101 @@ BotContext::MouseSeek BotContext::seekTurningRound(const PlayerState& player, Gu
 namespace
 {
 
+// Either way of facing the NPC, a little and then a little more: never so far
+// that it leaves the screen.
+constexpr std::array<float, BotContext::kNpcTurnSteps> kNpcTurns{0.35f, -0.35f, 0.7f, -0.7f};
+
+} // namespace
+
+BotContext::MouseSeek BotContext::seekNpcTurning(const PlayerState& player, Guid guid, const Vec3& npcPos, float zOffset)
+{
+    const TimePoint at = now();
+
+    if (guid != npcTurnGuid_ || at - npcTurnLastSeek_ > kTurnForgetAfter)
+    {
+        npcTurnGuid_ = guid;
+        npcTurnStep_ = 0;
+        npcTurnLooking_ = false;
+        npcTurnZoomTried_ = false;
+    }
+
+    npcTurnLastSeek_ = at;
+
+    if (npcTurnStep_ > static_cast<int>(kNpcTurns.size()))
+    {
+        return MouseSeek::NotFound;
+    }
+
+    // The camera on its way in or out: looked for again once it is there.
+    if (at < cameraSettledAt_)
+    {
+        npcTurnStepSince_ = at;
+        return MouseSeek::Searching;
+    }
+
+    if (npcTurnStep_ > 0 && !npcTurnLooking_)
+    {
+        // A turn that does not come about is not waited on: the mouse looks
+        // from where the character got to.
+        if (at - npcTurnStepSince_ > kTurnStepWait)
+        {
+            movement.stopTurning();
+        }
+        else if (!movement.faceHeading(player, normalizeAngle(headingTo(player.position, npcPos) + kNpcTurns[npcTurnStep_ - 1]), 0.15f))
+        {
+            return MouseSeek::Searching;
+        }
+
+        // The spots anew, where the NPC shows from here.
+        stopMouseSeek();
+        npcTurnLooking_ = true;
+    }
+
+    const auto seek = seekUnderMouse(guid, player, npcPos, zOffset);
+
+    if (seek == MouseSeek::Found)
+    {
+        npcTurnGuid_ = 0;
+        npcTurnStep_ = 0;
+        return seek;
+    }
+
+    if (seek != MouseSeek::NotFound)
+    {
+        return seek;
+    }
+
+    stopMouseSeek();
+
+    // Zoomed in first, and looked for straight on again before turning; that
+    // no good either, back out to turn.
+    if (npcTurnStep_ == 0)
+    {
+        if (!std::exchange(npcTurnZoomTried_, true) && zoomInBeforeTurning())
+        {
+            return MouseSeek::Searching;
+        }
+
+        zoomOutToTurn();
+    }
+
+    npcTurnLooking_ = false;
+    npcTurnStepSince_ = at;
+
+    if (++npcTurnStep_ > static_cast<int>(kNpcTurns.size()))
+    {
+        movement.stopTurning();
+        log.info(logcat::Input, "turned a little either way without the NPC coming under the mouse - giving it up");
+        return MouseSeek::NotFound;
+    }
+
+    log.info(logcat::Input, "the NPC is not under the mouse - turning a little to find it ({} of {})", npcTurnStep_, kNpcTurns.size());
+    return MouseSeek::Searching;
+}
+
+namespace
+{
+
 // The client keeps how far out the camera was (_cz) and goes back there:
 // GetCameraZoom is in every client that says what is under the mouse.
 constexpr std::string_view kCameraIn = "if GetCameraZoom then _cz=GetCameraZoom() CameraZoomIn(50) end";
@@ -720,6 +840,12 @@ constexpr std::string_view kCameraBack = "if _cz then CameraZoomOut(_cz) _cz=nil
 
 bool BotContext::zoomInForClick(int clicksMade)
 {
+    // Turning round goes with the camera out.
+    if (turningRound(turnGuid_) || turningRound(npcTurnGuid_))
+    {
+        return false;
+    }
+
     if (cameraZoomedIn_)
     {
         return now() < cameraSettledAt_;
@@ -741,6 +867,37 @@ bool BotContext::zoomInForClick(int clicksMade)
     stopMouseSeek();
     log.info(logcat::Input, "{} right-click(s) did nothing - camera all the way in for the next", clicksMade);
     return true;
+}
+
+bool BotContext::zoomInBeforeTurning()
+{
+    if (cameraZoomedIn_ || config.zoomInAfterClicks <= 0 || !provider || !provider->mouseoverGuid())
+    {
+        return false;
+    }
+
+    if (!(canRunScripts() ? runScript(kCameraIn) : actions.chatScript(kCameraIn)))
+    {
+        return false;
+    }
+
+    cameraZoomedIn_ = true;
+    cameraSettledAt_ = now() + config.cameraZoomSettle;
+    stopMouseSeek();
+    log.info(logcat::Input, "not got hold of it under the mouse - camera all the way in before turning round");
+    return true;
+}
+
+void BotContext::zoomOutToTurn()
+{
+    if (!cameraZoomedIn_)
+    {
+        return;
+    }
+
+    restoreCamera();
+    cameraSettledAt_ = now() + config.cameraZoomSettle;
+    stopMouseSeek();
 }
 
 void BotContext::restoreCamera()
