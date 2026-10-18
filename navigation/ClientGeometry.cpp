@@ -867,11 +867,22 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
                                wet[cellIndex] = 1;
                            }
 
-                           if (!steep.empty())
+                           if (thisChunk < 256 && !steep.empty())
                            {
-                               const auto z = [&](int v) { return geometry.vertices[static_cast<std::size_t>(v)].z; };
-                               const float dx = (z(d) + z(e) - z(a) - z(b)) / (2 * cell), dy = (z(b) + z(e) - z(a) - z(d)) / (2 * cell);
-                               steep[cellIndex] = std::hypot(dx, dy) > kRoadSlope ? 1 : 0;
+                               // Of the cell's four triangles, how steep they are
+                               // on the whole: a bump in its middle is steep
+                               // too, though its corners are level.
+                               float slope = 0;
+
+                               for (const auto& [p, q] : {std::pair{a, b}, std::pair{b, e}, std::pair{e, d}, std::pair{d, a}})
+                               {
+                                   const Vec3 u = geometry.vertices[static_cast<std::size_t>(q)] - geometry.vertices[static_cast<std::size_t>(p)];
+                                   const Vec3 v = geometry.vertices[static_cast<std::size_t>(m)] - geometry.vertices[static_cast<std::size_t>(p)];
+                                   const float nx = u.y * v.z - u.z * v.y, ny = u.z * v.x - u.x * v.z, nz = u.x * v.y - u.y * v.x;
+                                   slope += std::hypot(nx, ny) / std::max(std::fabs(nz), 1e-6f) / 4;
+                               }
+
+                               steep[cellIndex] = slope > kRoadSlope ? 1 : 0;
                            }
 
                            if (tag == kRoadGround && !tagged_.empty())
@@ -901,14 +912,19 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
         // The cells by layout row and column, as keepRoads has them.
         constexpr int kSide = 128;
         const auto at = [](int row, int col) { return static_cast<std::size_t>((row / 8 * 16 + col / 8) * 64 + (row % 8) * 8 + col % 8); };
-        auto inland = tagged_;
+        // A hillside's dirt is in patches that run together: no road before
+        // it is looked at. The water's banks are taken off what is kept, a road
+        // across a stream not left in two pieces too short for one.
+        auto flat = tagged_;
 
-        for (std::size_t i = 0; i < inland.size(); ++i)
+        for (std::size_t i = 0; i < flat.size(); ++i)
         {
-            inland[i] = inland[i] && !steep[i] ? 1 : 0;
+            flat[i] = flat[i] && !steep[i] ? 1 : 0;
         }
 
-        for (int row = 0; row < kSide; ++row)
+        auto kept = keepRoads(std::move(flat));
+
+        for (int row = 0; row < kSide && !kept.empty(); ++row)
         {
             for (int col = 0; col < kSide; ++col)
             {
@@ -921,13 +937,11 @@ CollisionGeometry parseAdtTerrain(Bytes bytes, Bytes roadCells, bool roadsOnly)
                 {
                     for (int c = std::max(0, col - kRoadOffShore); c <= std::min(kSide - 1, col + kRoadOffShore); ++c)
                     {
-                        inland[at(r, c)] = 0;
+                        kept[at(r, c)] = 0;
                     }
                 }
             }
         }
-
-        const auto kept = keepRoads(std::move(inland));
 
         for (std::size_t cell = 0; cell < tagged_.size(); ++cell)
         {
