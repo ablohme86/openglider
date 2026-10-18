@@ -79,6 +79,12 @@ public:
     {
     }
 
+    // A tall character (a tauren): under a low roof only where there is no
+    // way round it.
+    virtual void setTall(bool)
+    {
+    }
+
     // A shortcut must stay on connected walking surfaces, including its end floor.
     virtual bool canWalkStraight(const Vec3&, const Vec3&) const
     {
@@ -89,6 +95,13 @@ public:
     // the bed of the lake a swimmer - or a ghost, walking on the water - is
     // over. nullopt where the point stands on the map, or nothing lies below.
     virtual std::optional<float> groundBelow(const Vec3&) const
+    {
+        return std::nullopt;
+    }
+
+    // Whether the ground at a point has a roof over it - a house's, a cave's
+    // rock; nullopt where the map does not tell.
+    virtual std::optional<bool> underRoof(const Vec3&) const
     {
         return std::nullopt;
     }

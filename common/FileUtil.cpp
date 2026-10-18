@@ -26,6 +26,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <regex>
 #include <sstream>
 
 namespace og
@@ -196,6 +197,13 @@ std::filesystem::path executableDirectory()
 
     return self.parent_path();
 #endif
+}
+
+std::string textLocaleOf(std::string_view configWtf)
+{
+    static const std::regex line(R"re(^[ \t]*SET[ \t]+textLocale[ \t]+"(\w{4})")re", std::regex::icase | std::regex::multiline);
+    std::match_results<std::string_view::const_iterator> m;
+    return std::regex_search(configWtf.begin(), configWtf.end(), m, line) ? m[1].str() : std::string("enUS");
 }
 
 } // namespace og

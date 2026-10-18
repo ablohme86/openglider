@@ -70,21 +70,25 @@ static std::optional<int> smallCount(const std::string& digits)
 static std::string normalizeQuestTitle(std::string text)
 {
     text = lower(trimmed(plainChatText(text)));
-    if (constexpr std::string_view completeSuffix = " (complete)"; text.ends_with(completeSuffix))
+
+    // "(Complete)" after a quest done, in the client's language.
+    for (const std::string_view done : {" (complete)", " (completed)", "(完成)", " (完成)", "(已完成)", " (abgeschlossen)", " (terminée)", " (completa)", " (completada)", " (completo)", " (выполнено)", " (완료)"})
     {
-        text.resize(text.size() - completeSuffix.size());
+        if (text.ends_with(done))
+        {
+            text.resize(text.size() - done.size());
+            break;
+        }
     }
-    else if (constexpr std::string_view completeSuffix2 = " (completed)"; text.ends_with(completeSuffix2))
-    {
-        text.resize(text.size() - completeSuffix2.size());
-    }
+
     return trimmed(text);
 }
 
 std::optional<ObjectiveCount> parseObjectiveCount(std::string_view line)
 {
     static const std::regex countFirst(R"(^\s*(\d+)\s*/\s*(\d+)\s+(.+)$)");
-    static const std::regex countLast(R"(^(.+?):\s*(\d+)\s*/\s*(\d+)\s*$)");
+    // The colon English writes, or the full-width one of Chinese clients.
+    static const std::regex countLast(R"(^(.+?)(?::|\xEF\xBC\x9A)\s*(\d+)\s*/\s*(\d+)\s*$)");
     std::string text = plainChatText(line);
     bool lineCompleted = false;
     if (constexpr std::string_view comp = " (complete)"; lower(text).ends_with(comp))

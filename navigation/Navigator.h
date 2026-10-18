@@ -21,6 +21,7 @@
 #include "og/common/EventBus.h"
 #include "og/common/Log.h"
 #include "og/navigation/INavigationProvider.h"
+#include "og/navigation/Lifts.h"
 #include "og/navigation/MovementController.h"
 #include "og/navigation/ObstacleMemory.h"
 #include "og/navigation/StuckDetector.h"
@@ -135,6 +136,27 @@ public:
     const std::vector<AvoidZone>& mobZones() const
     {
         return mobZones_;
+    }
+
+    // The lifts known, and their cars in sight.
+    const LiftWatch& lifts() const
+    {
+        return lifts_;
+    }
+    // Riding a lift, or on the way to one, waiting for its car.
+    bool onLiftTrip() const
+    {
+        return ride_.has_value();
+    }
+    // The heading off the car at the other stop, on a lift trip.
+    std::optional<float> liftExitHeading() const
+    {
+        return ride_ ? std::optional<float>{ride_->exitHeading} : std::nullopt;
+    }
+    // Where the car is waited for, on a lift trip.
+    std::optional<Vec3> liftWaitAt() const
+    {
+        return ride_ ? std::optional<Vec3>{ride_->waitAt} : std::nullopt;
     }
 
     void setProvider(INavigationProvider& provider)
@@ -316,6 +338,11 @@ private:
     std::optional<TimePoint> headwayAt_;  // since when going without getting kHeadway from headwayFrom_
     Vec3 headwayFrom_{};
     std::vector<TimePoint> reroutes_; // new paths to the same place while mob circles were about
+    // The mobs whose reach a way to crossedTo_ crossed, and when: one
+    // crossing it again, the bot is going back and forth between ways round.
+    std::vector<std::pair<Vec3, TimePoint>> crossed_;
+    std::optional<Vec3> crossedTo_;
+    bool crossedBefore(const AvoidZone& zone, const Vec3& to);
     TimePoint lastReroute_{};
     TimePoint pastMobsUntil_{};
     bool exact_ = false;
@@ -332,6 +359,10 @@ private:
     {
         AvoidZone zone;
         TimePoint until;
+        // Where the bot stood stuck: a narrower zone there, just ahead of it,
+        // where the wide one closes the way beside it too.
+        Vec3 at;
+        Vec3 along;
     };
     std::vector<JamZone> jamZones_;
     void rememberJam(const Vec3& at, const Vec3& along);
@@ -366,6 +397,54 @@ private:
 
     StuckDetector stuck_;
     StuckRecovery recovery_;
+
+    // A way up to Thunder Bluff's mesa, or down from it, by lift: to where its
+    // car stops, waited for there, ridden, and stepped off at the other stop.
+    // Riding, the client tells the character where it got on until it steps
+    // off: the car's height says where it is.
+    struct LiftRide
+    {
+        Lift lift;
+        bool fromTop = false;
+        // The destination on the other level: a vendor's place in the quest
+        // data has no height, and the character's was taken for it.
+        Vec3 to;
+        enum class Stage
+        {
+            ToStop,
+            Waiting,
+            Boarding,
+            Riding,
+            Leaving
+        } stage = Stage::ToStop;
+        TimePoint since{};
+        // Ground by the shaft on the map, where the car is waited for, and
+        // where it is stepped off to: the shaft itself is no ground on it.
+        Vec3 waitAt;
+        // The gate onto the car at the stop got on at, where one is known:
+        // walked through its middle before the car's.
+        std::optional<Vec3> gateAt;
+        Vec3 stepOffTo;
+        // The way off the car at the other stop, found when the trip is
+        // planned: the heading from the car's middle along which the map has
+        // ground farthest out (the plank into Thunder Bluff), and how far.
+        // Turned to while riding, and walked straight off along: the car's
+        // floor is not on the map, and the bot's place on it is a guess -
+        // steered by that, it walked over the edge beside the plank.
+        float exitHeading = 0.0f;
+        float exitReach = 0.0f;
+    };
+    LiftWatch lifts_;
+    std::optional<LiftRide> ride_;
+    // Where a lift took the bot to, for the destination asked for.
+    std::optional<std::pair<Vec3, Vec3>> liftTo_;
+    std::optional<Vec3> liftCheckedFor_;
+    // The lifts known when the way was last looked at for one: a lift learnt
+    // on the way is looked at for the destination again.
+    int liftsChecked_ = 0;
+    std::optional<LiftRide> planLift(const GameSnapshot& snapshot, const Vec3& to);
+    // The lift trip, while there is one: its status, or nullopt to walk on.
+    std::optional<NavStatus> rideLift(const GameSnapshot& snapshot, Vec3& destination, bool exact);
 
     std::optional<Vec3> destination_;
     Path path_;

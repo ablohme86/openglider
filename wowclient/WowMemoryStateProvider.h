@@ -66,8 +66,10 @@ struct WowProviderConfig
     // radar should too. What the bot goes for is limited by the pull distance.
     float visibilityRange = 250.0f;
     // The client's install directory (the one holding WTF), where a client
-    // without Lua has its key bindings. Empty: the client's working directory.
-    std::string installDirectory;
+    // without Lua has its key bindings and its Config.wtf its language. Empty:
+    // the client's working directory (on Linux; on Windows set by the caller,
+    // from the executable's path).
+    std::filesystem::path installDirectory;
     Duration reattachInterval{2000};
     // The 64-bit clients (2.5.6 and whatever follows) need a registered copy.
     // The desktop UI turns this off until the license server vouches for the key.
@@ -291,6 +293,13 @@ private:
     // The 64-bit client's action bars, with the keys its WTF bindings give them.
     std::vector<ActionBarSlot> readModernActionBars();
     std::filesystem::path installDirectory() const;
+
+public:
+    // The client's language, from its WTF/Config.wtf (textLocale): enUS where
+    // it cannot be read.
+    std::string gameLocale() const;
+
+private:
     std::uint32_t objectManager() const;
     std::vector<RawObject> enumerateObjects(Guid& localGuid) const;
     bool readUnit(const RawObject& obj, UnitState& unit) const;

@@ -33,9 +33,14 @@
 #include "og/core/StrongMobWatch.h"
 #include "og/input/IInputBackend.h"
 #include "og/navigation/Navigator.h"
+#include "og/navigation/Ships.h"
 #include "og/navigation/WaypointRoute.h"
 #include "og/profiles/GliderProfile.h"
 #include "og/targets/TargetSelector.h"
+#include "og/world/GameNames.h"
+#include "og/world/TaxiNetwork.h"
+
+#include <memory>
 
 namespace og
 {
@@ -334,6 +339,16 @@ struct BotContext
     };
     Breath breath;
     IQuestSource* questSource = nullptr; // Questing's data, where there is any
+    // The zeppelins and boats in sight: parked, leaving or coming in.
+    ShipWatch ships;
+    // The game's names in the client's language, where it is not English.
+    std::shared_ptr<const GameNames> gameNames;
+    // The flight paths, from the client's tables, where they could be read.
+    std::shared_ptr<const TaxiNetwork> taxiNetwork;
+    const TaxiNetwork* network() const
+    {
+        return taxiNetwork.get();
+    }
     TimePoint questPullAfter{};          // let kill credit reach the quest log before the next pull
     // A profile with no vendor route: the vendor found in sight at Resume, clear
     // of No Go zones and obstacles, walked to straight for the vendor trips.

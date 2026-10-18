@@ -383,6 +383,13 @@ struct BotConfig
     // to the nearest trainer of the character's class to learn what it
     // teaches now.
     bool trainAbilities = true;
+    // Learn Flight Paths (General Settings): a flight master within 250 yd with a
+    // flight path not learnt (the green "!") talked to on the way, so the
+    // character knows it.
+    bool learnFlightPaths = true;
+    // Use Flight Paths (General Settings): a far Go To flown where a flight
+    // path learnt saves a fair part of the way.
+    bool useFlightPaths = true;
     // Auto Equip New Items (General Settings): gear that comes into the bags -
     // loot, a quest's reward - put on when it is better for the class than
     // what is worn there (gearRank), with the bags opened to read it and a

@@ -1466,7 +1466,7 @@ BehaviorStatus VendorBehavior::tickMerchantUi(const GameSnapshot& s, BotContext&
                 // The line that opens the shop, by what it says: "I want to
                 // browse your goods.", "I'd like to see what you have to
                 // sell." (Farmer Saldean), "What do you have for sale?".
-                for (std::string_view phrase : {"browse", "Browse", "goods", "Goods", "wares", "to sell", "for sale", "buy"})
+                for (std::string_view phrase : {"browse", "Browse", "goods", "Goods", "wares", "to sell", "for sale", "buy", "貨物", "货物", "商品"})
                 {
                     if (const auto opt = ctx.provider->uiFrameWithText("GossipFrame", phrase); opt && opt->visible)
                     {

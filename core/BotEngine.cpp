@@ -249,6 +249,30 @@ void BotEngine::tick(const SnapshotObserver& beforeBehaviors)
         beforeBehaviors(*snapshot);
     }
 
+    ctx_.ships.update(*snapshot);
+
+    // Flying a flight path: the game flies the character; nothing is done
+    // until it lands.
+    if (snapshot->player.isOnTaxi != onTaxi_)
+    {
+        onTaxi_ = snapshot->player.isOnTaxi;
+        ctx_.log.info(logcat::State, "{}", onTaxi_ ? "flying" : "landed");
+    }
+
+    if (onTaxi_)
+    {
+        if (current_)
+        {
+            current_->onExit(ctx_);
+            current_ = nullptr;
+        }
+
+        ctx_.movement.stop();
+        ctx_.actions.releaseAll();
+        last_ = std::move(snapshot);
+        return;
+    }
+
     if (state_ == EngineState::Paused && !manualTravel_)
     {
         if (current_)
@@ -285,7 +309,9 @@ void BotEngine::tick(const SnapshotObserver& beforeBehaviors)
 
     for (const auto& b : behaviors_)
     {
-        if (manualTravel_ && (!travelDefense_ || (b->name() != "Combat" && b->name() != "Emergency")))
+        // On a Go To, only a fight forced on it - and a flight path not
+        // learnt passed by (Learn Flight Paths), the Go To waiting for it.
+        if (manualTravel_ && b->name() != "Learn Flight Path" && (!travelDefense_ || (b->name() != "Combat" && b->name() != "Emergency")))
         {
             continue;
         }

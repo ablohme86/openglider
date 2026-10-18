@@ -63,6 +63,26 @@ bool isMountVendor(std::string_view subName)
     return false;
 }
 
+// A vendor of a holiday (Lunar Festival, Hallow's End) or of the Darkmoon
+// Faire: in the data all year, there only while it lasts.
+bool isEventVendor(std::string_view name, std::string_view subName)
+{
+    if (name.find("Festival") != std::string_view::npos)
+    {
+        return true;
+    }
+
+    for (const std::string_view title : {"Hallow's End", "Darkmoon Faire", "Lunar Festival", "Midsummer", "Brewfest", "Winter Veil"})
+    {
+        if (subName.find(title) != std::string_view::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 namespace
 {
 
@@ -191,6 +211,41 @@ std::uint32_t QuestSource::canonicalZone(std::uint32_t zone) const
     }
 
     return known ? zone : og::canonicalZone(zone);
+}
+
+void QuestSource::useGameNames(const GameNames& names)
+{
+    std::size_t changed = 0;
+    const auto use = [&](std::string& name, const std::optional<std::string>& in)
+    {
+        if (in && !in->empty())
+        {
+            name = *in;
+            ++changed;
+        }
+    };
+
+    for (auto& [id, quest] : quests_)
+    {
+        use(quest.name, names.quest(id));
+    }
+
+    for (auto& [id, name] : npcNames_)
+    {
+        use(name, names.npc(id));
+    }
+
+    for (auto& [id, name] : itemNames_)
+    {
+        use(name, names.item(id));
+    }
+
+    for (auto& [id, name] : objectNames_)
+    {
+        use(name, names.object(id));
+    }
+
+    localized_ = changed > 0;
 }
 
 bool QuestSource::load(const Files& files, MapOfZone mapOfZone, std::string* error)
@@ -546,7 +601,7 @@ bool QuestSource::loadFromDb(const std::filesystem::path& dbPath, MapOfZone mapO
             const auto friendlyTo = npcStmt.columnString(5);
             const auto flags = npcStmt.columnInt(6);
 
-            if ((flags & 4) && !isMountVendor(subName))
+            if ((flags & 4) && !isMountVendor(subName) && !isEventVendor(name, subName))
             {
                 vendors_.emplace_back(entry, friendlyTo);
                 repairers_[entry] = (flags & 16384) != 0;
@@ -781,7 +836,10 @@ bool QuestSource::loadFromJson(std::string_view questsText, std::string_view npc
             const int flags = n.find("npcFlags") ? n.find("npcFlags")->asInt() : 0;
             const Json* subName = n.find("subName");
 
-            if ((flags & 4) && !(subName && subName->isString() && isMountVendor(subName->asString(""))))
+            const std::string vendorName = n.find("name") && n.find("name")->isString() ? n.find("name")->asString("") : std::string();
+            const std::string vendorTitle = subName && subName->isString() ? subName->asString("") : std::string();
+
+            if ((flags & 4) && !isMountVendor(vendorTitle) && !isEventVendor(vendorName, vendorTitle))
             {
                 vendors_.emplace_back(entry, n.find("friendlyTo") ? n.find("friendlyTo")->asString("") : "");
                 repairers_[entry] = (flags & 16384) != 0;
@@ -983,6 +1041,12 @@ bool QuestSource::isCampingQuest(std::uint32_t questId) const
 
     const std::string& name = it->second.name;
     return name == "The Adventurer" || name == "The Great Outdoors" || name.starts_with("Camping 101:");
+}
+
+bool QuestSource::isQuestTheBotCannotDo(std::uint32_t questId) const
+{
+    const auto it = quests_.find(questId);
+    return it != quests_.end() && it->second.name == "Kyle's Gone Missing!";
 }
 
 bool QuestSource::isEliteQuest(std::uint32_t questId) const
@@ -1815,6 +1879,15 @@ std::vector<QuestTarget> QuestSource::targets(const GameSnapshot& s)
                         return line.want;
                     }
                 }
+
+                // In another language the line words the name its own way.
+                for (const auto& line : *tracked)
+                {
+                    if (localized_ && !key.empty() && lower(line.name).find(key) != std::string::npos && line.want > 0)
+                    {
+                        return line.want;
+                    }
+                }
             }
 
             const auto found = s.player.objectiveWanted.find(key);
@@ -1831,6 +1904,16 @@ std::vector<QuestTarget> QuestSource::targets(const GameSnapshot& s)
             for (std::size_t i = 0; tracked && !key.empty() && i < tracked->size(); ++i)
             {
                 if (const std::string line = lower((*tracked)[i].name); line == key || (startsWith && line.starts_with(key + " ")))
+                {
+                    lineKnown[i] = true;
+                    return &(*tracked)[i];
+                }
+            }
+
+            // In another language the line words the name its own way.
+            for (std::size_t i = 0; localized_ && tracked && !key.empty() && i < tracked->size(); ++i)
+            {
+                if (lower((*tracked)[i].name).find(key) != std::string::npos)
                 {
                     lineKnown[i] = true;
                     return &(*tracked)[i];

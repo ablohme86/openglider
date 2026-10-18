@@ -576,6 +576,7 @@ bool WowMemoryStateProvider::readUnit(const RawObject& obj, UnitState& u) const
     u.inCombat = (flags & c::UnitFlagInCombat) != 0;
     u.isSkinnable = (flags & c::UnitFlagSkinnable) != 0;
     u.isFleeing = (flags & c::UnitFlagFleeing) != 0;
+    u.isOnTaxi = (flags & c::UnitFlagOnTaxi) != 0;
     u.isLootable = (dyn & c::DynFlagLootable) != 0;
     u.isTappedByOther = (dyn & c::DynFlagTapped) != 0 && (dyn & L.dynFlagTappedByPlayer) == 0;
     // NPCs with a service (vendor, quest giver, guard gossip, ...) or flagged
@@ -1278,7 +1279,7 @@ std::optional<GameSnapshot> WowMemoryStateProvider::capture()
         {
             GameObjectState g;
 
-            if (readGameObject(obj, g) && distance(g.position, s.player.position) <= config_.visibilityRange)
+            if (readGameObject(obj, g) && (distance(g.position, s.player.position) <= config_.visibilityRange || keptAtAnyDistance(g)))
             {
                 s.objects.push_back(std::move(g));
             }
@@ -2011,6 +2012,18 @@ std::filesystem::path WowMemoryStateProvider::installDirectory() const
     }
 #endif
     return {};
+}
+
+std::string WowMemoryStateProvider::gameLocale() const
+{
+    const auto install = installDirectory();
+
+    if (install.empty())
+    {
+        return "enUS";
+    }
+
+    return textLocaleOf(readTextFile(install / "WTF" / "Config.wtf").value_or(""));
 }
 
 std::vector<ActionBarSlot> WowMemoryStateProvider::readModernActionBars()
@@ -3116,6 +3129,18 @@ std::string WowMemoryStateProvider::describe()
 
     const PlayerState& p = snap->player;
     out += std::format("player '{}' {} level {} class {} race {} faction template {} hp {}/{} power {}/{} ({})\n", p.name, formatGuid(p.guid), p.level, toString(p.playerClass), p.race, p.factionTemplate, p.health, p.maxHealth, p.power, p.maxPower, toString(p.powerType));
+
+    if (p.knownTaxiNodes)
+    {
+        std::string nodes;
+
+        for (const auto id : *p.knownTaxiNodes)
+        {
+            nodes += std::format("{}{}", nodes.empty() ? "" : ", ", id);
+        }
+
+        out += std::format("flight points learnt: {}\n", nodes.empty() ? std::string("none") : nodes);
+    }
     out += std::format("position {} heading {:.2f} map {} zone {} \"{}\" combat={} autoAttack={} shooting={} dead={} ghost={} sitting={}\n", p.position, p.heading, snap->mapId ? std::to_string(*snap->mapId) : "?", snap->zoneId, snap->zoneText, p.inCombat, p.isAutoAttacking, p.isShooting, p.isDead, p.isGhost, p.isSitting);
 
     out += std::format("xp {}/{}  target {}  auras {}  broken items {}  money {}\n", p.xp, p.nextLevelXp, formatGuid(snap->targetGuid), p.auras.size(), p.brokenItems, p.money < 0 ? std::string("?") : std::format("{}g {}s {}c", p.money / 10000, p.money / 100 % 100, p.money % 100));
@@ -3183,7 +3208,7 @@ std::string WowMemoryStateProvider::describe()
     for (std::size_t i = 0; i < std::min<std::size_t>(units.size(), 15); ++i)
     {
         const UnitState& u = *units[i];
-        out += std::format("  {:<24} lvl {:>2} hp {:>5}/{:<5} dist {:>5.1f} {:<8} ft {:<5} {}{}{}{}{}{}{}{}\n", u.name.empty() ? "(player)" : u.name, u.level, u.health, u.maxHealth, distance(u.position, p.position), toString(u.reaction), u.factionTemplate, u.classification != Classification::Normal ? std::string(toString(u.classification)) + " " : std::string(), u.inCombat ? "combat " : "", u.isDead ? "dead " : "", u.isLootable ? "lootable " : "", u.isSkinnable ? "skinnable " : "", u.isVendor ? "vendor " : "", u.canRepair ? "repair " : "", u.questMarker == QuestMarker::Available ? "quest !" : u.questMarker == QuestMarker::Reward ? "quest ?" : u.questMarker == QuestMarker::Incomplete ? "quest ? (not done)" : "");
+        out += std::format("  {:<24} lvl {:>2} hp {:>5}/{:<5} dist {:>5.1f} {:<8} ft {:<5} {}{}{}{}{}{}{}{}{}\n", u.name.empty() ? "(player)" : u.name, u.level, u.health, u.maxHealth, distance(u.position, p.position), toString(u.reaction), u.factionTemplate, u.classification != Classification::Normal ? std::string(toString(u.classification)) + " " : std::string(), u.inCombat ? "combat " : "", u.isDead ? "dead " : "", u.isLootable ? "lootable " : "", u.isSkinnable ? "skinnable " : "", u.isVendor ? "vendor " : "", u.canRepair ? "repair " : "", u.isFlightMaster ? (u.newFlightPath ? "flight master (new flight path !) " : "flight master ") : "", u.questMarker == QuestMarker::Available ? "quest !" : u.questMarker == QuestMarker::Reward ? "quest ?" : u.questMarker == QuestMarker::Incomplete ? "quest ? (not done)" : "");
     }
 
     for (std::size_t i = 0; i < std::min<std::size_t>(snap->objects.size(), 10); ++i)

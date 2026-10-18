@@ -99,6 +99,8 @@ inline constexpr int PartyWait = 580;
 inline constexpr int ClearPath = 560;
 inline constexpr int Vendor = 500;
 inline constexpr int InventoryQuest = 470;
+// Learn a flight path: a flight master with the green "!" close by.
+inline constexpr int LearnFlightPath = 455;
 inline constexpr int QuestHandIn = 450;
 // Train Abilities: to the class trainer after an even level, finished
 // quests handed in first.

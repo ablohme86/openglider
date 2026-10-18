@@ -315,6 +315,13 @@ std::optional<Vec3> pickRoamPoint(const std::vector<Vec3>& route, const Vec3& fr
                 continue;
             }
 
+            // Not the bed of a lake: roaming the whole of Mulgore, the bot
+            // swam about the lake by Bloodhoof Village until out of breath.
+            if (const auto surface = provider->waterSurface(candidate); surface && *surface > candidate.z + 1.0f)
+            {
+                continue;
+            }
+
             if (area && !insideRoute(route, candidate))
             {
                 continue;

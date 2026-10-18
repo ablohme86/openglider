@@ -124,6 +124,11 @@ struct ModernLayout
     // u32 in the object header: the quest marker over the NPC's head, see
     // modern::QuestGiver*. 0: not known.
     std::uint32_t unitQuestGiverStatus = 0;
+    // u32 in the object header beside it: what marker the NPC shows. Not 0
+    // on a flight master whose flight path the character has not learnt (the
+    // green "!": 3 at Karos Razok in The Sepulcher, 0 once learnt), and on a
+    // quest giver with its marker too. 0: not known.
+    std::uint32_t unitInteractMarker = 0;
     std::uint32_t unitBytes0 = 0;          // race, class
     std::uint32_t unitBytes1 = 0;          // its low byte the stand state: 1-6 sat (0: not known)
     std::uint32_t unitLevel = 0;           // u32
@@ -148,6 +153,10 @@ struct ModernLayout
     std::uint32_t playerQuestLogStride = 0;
     // Within an entry: a u16 counter per objective, the first objective first.
     std::uint32_t playerQuestLogProgress = 0;
+    // The flight points learnt: a pointer to a bit array, its length in bytes
+    // after it; bit (id - 1) is TaxiNodes id's. Set without the flight map
+    // open. 0: not known.
+    std::uint32_t playerKnownTaxiNodes = 0;
     int inventoryBagFirst = 0; // the equipped bags
     int inventoryBagCount = 0;
     int inventoryBackpackFirst = 0;
@@ -247,6 +256,7 @@ inline constexpr std::uint32_t UnitDynFlagTappedByOther = 0x10;
 
 inline constexpr std::uint32_t NpcFlagVendor = 0x80;
 inline constexpr std::uint32_t NpcFlagRepair = 0x1000;
+inline constexpr std::uint32_t NpcFlagFlightMaster = 0x2000;
 
 // The quest marker's bits, seen on 1.60.1 while quests were taken and handed
 // in: 0x15 and 0x16 a yellow !, 0x22 a yellow ?, 0x0D a grey ?, 0 none. The

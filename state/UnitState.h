@@ -96,6 +96,11 @@ struct UnitState
     bool isAttackable = true; // false for vendors, quest givers, guards and other NPCs you cannot attack
     bool isVendor = false;    // sells goods (NPC flag), so the bot can unload at it
     bool canRepair = false;   // also repairs (NPC flag)
+    bool isFlightMaster = false; // flies players about (NPC flag)
+    bool isOnTaxi = false;       // flying a flight path (unit flag)
+    // A flight master whose flight path the character has not learnt: the
+    // green "!" over its head.
+    bool newFlightPath = false;
     QuestMarker questMarker = QuestMarker::None;
 
     Guid targetGuid = 0;
@@ -244,6 +249,9 @@ struct PlayerState : UnitState
     std::vector<ItemStack> bagItems; // backpack + bags
     // The ids of the quests in the quest log; empty when the client does not tell.
     std::vector<std::uint32_t> questLog;
+    // The flight points (TaxiNodes ids) the character has learnt, lowest
+    // first; nullopt when the client does not tell.
+    std::optional<std::vector<std::uint32_t>> knownTaxiNodes;
     // What has been killed for each quest in the log, objective by objective
     // (the order the quest lists its kill objectives in); items are counted in the bags.
     struct QuestProgress

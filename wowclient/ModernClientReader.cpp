@@ -393,6 +393,7 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
     u.inCombat = (flags & c::UnitFlagInCombat) != 0;
     u.isSkinnable = (flags & c::UnitFlagSkinnable) != 0;
     u.isFleeing = (flags & c::UnitFlagFleeing) != 0;
+    u.isOnTaxi = (flags & c::UnitFlagOnTaxi) != 0;
     u.isAttackable = (flags & (c::UnitFlagNonAttackable | c::UnitFlagImmuneToPc | c::UnitFlagNotSelectable)) == 0;
     u.isDead = u.health == 0;
 
@@ -401,6 +402,7 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
         const auto npcFlags = field<std::uint32_t>(f, L_.unitNpcFlags - at);
         u.isVendor = (npcFlags & modern::NpcFlagVendor) != 0;
         u.canRepair = (npcFlags & modern::NpcFlagRepair) != 0;
+        u.isFlightMaster = (npcFlags & modern::NpcFlagFlightMaster) != 0;
 
         // A vendor, trainer or quest giver is no mob to pull.
         if (npcFlags != 0)
@@ -413,6 +415,13 @@ bool ModernClientReader::readUnit(const Object& obj, std::uint32_t clock, UnitSt
     {
         const auto status = field<std::uint32_t>(head.data(), L_.unitQuestGiverStatus);
         u.questMarker = (status & modern::QuestGiverReward) ? QuestMarker::Reward : (status & modern::QuestGiverAvailable) ? QuestMarker::Available : (status & modern::QuestGiverIncomplete) ? QuestMarker::Incomplete : QuestMarker::None;
+    }
+
+    // A flight master's marker with no quest's: the green "!" of a flight
+    // path not learnt.
+    if (u.isFlightMaster && L_.unitInteractMarker && L_.unitInteractMarker + 4 <= headerSize_ && u.questMarker == QuestMarker::None)
+    {
+        u.newFlightPath = field<std::uint32_t>(head.data(), L_.unitInteractMarker) != 0;
     }
 
     // A beast is skinnable from the moment it dies, loot or not: only the dynamic flags say.
@@ -562,6 +571,46 @@ void ModernClientReader::readPlayer(const Object& obj, PlayerState& p) const
 
     readSkills(obj, p);
     readQuestLog(obj, p);
+    readKnownTaxiNodes(obj, p);
+}
+
+void ModernClientReader::readKnownTaxiNodes(const Object& obj, PlayerState& p) const
+{
+    if (!L_.playerKnownTaxiNodes)
+    {
+        return;
+    }
+
+    const auto array = memory_.read<std::uint64_t>(obj.base + L_.playerKnownTaxiNodes);
+    const auto length = memory_.read<std::uint32_t>(obj.base + L_.playerKnownTaxiNodes + 8);
+
+    // 64 bytes on 1.60.1 (flight points up to 512); more is no bit array.
+    if (!array || !length || *length > 4096)
+    {
+        return;
+    }
+
+    std::vector<std::uint8_t> bits(*length);
+
+    if (*length > 0 && (!*array || !memory_.read(*array, bits.data(), bits.size())))
+    {
+        return;
+    }
+
+    std::vector<std::uint32_t> known;
+
+    for (std::size_t i = 0; i < bits.size(); ++i)
+    {
+        for (int b = 0; b < 8; ++b)
+        {
+            if (bits[i] & (1u << b))
+            {
+                known.push_back(static_cast<std::uint32_t>(i * 8 + b + 1));
+            }
+        }
+    }
+
+    p.knownTaxiNodes = std::move(known);
 }
 
 void ModernClientReader::readQuestLog(const Object& obj, PlayerState& p) const
@@ -2107,6 +2156,49 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
 
     readBags(all, *self, s.player);
 
+    // On a lift's car the client gives the character's place on the car, a
+    // few yards from its middle: the radar drew it far off, and the bot took
+    // itself for somewhere else. The car's place added, it is where it is.
+    {
+        const Vec3 p = s.player.position;
+        const bool onACar = std::hypot(p.x, p.y) <= 12.0f && std::fabs(p.z) <= 6.0f;
+        std::optional<Vec3> car;
+
+        if (onACar && lastInWorld_)
+        {
+            for (const auto& obj : all)
+            {
+                GameObjectState g;
+
+                if (obj.type == modern::TypeGameObject && readGameObject(obj, g) && keptAtAnyDistance(g) && distance2D(g.position, *lastInWorld_) <= 30.0f && (!car || distance2D(g.position, *lastInWorld_) < distance2D(*car, *lastInWorld_)))
+                {
+                    car = g.position;
+                }
+            }
+        }
+
+        if (car)
+        {
+            // Its heading on the car is turned by as much as the car is: the
+            // bot turned to the way off by it, and walked off over the edge.
+            if (!carTurn_)
+            {
+                carTurn_ = normalizeAngle(lastHeadingInWorld_ - s.player.heading);
+            }
+
+            const float c = std::cos(*carTurn_);
+            const float sn = std::sin(*carTurn_);
+            s.player.position = *car + Vec3{p.x * c - p.y * sn, p.x * sn + p.y * c, p.z};
+            s.player.heading = normalizeHeading(s.player.heading + *carTurn_);
+        }
+        else if (!onACar)
+        {
+            lastInWorld_ = p;
+            lastHeadingInWorld_ = s.player.heading;
+            carTurn_.reset();
+        }
+    }
+
     std::vector<Guid> taggedByUs;
 
     for (const auto& obj : all)
@@ -2134,7 +2226,7 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
         {
             GameObjectState g;
 
-            if (readGameObject(obj, g) && distance(g.position, s.player.position) <= visibilityRange)
+            if (readGameObject(obj, g) && (distance(g.position, s.player.position) <= visibilityRange || keptAtAnyDistance(g)))
             {
                 s.objects.push_back(std::move(g));
             }

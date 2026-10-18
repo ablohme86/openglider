@@ -97,6 +97,11 @@ public:
         avoidWater_ = on;
     }
 
+    void setTall(bool on) override
+    {
+        tall_ = on;
+    }
+
     bool canWalkStraight(const Vec3& from, const Vec3& to) const override;
     std::optional<Vec3> findWalkablePoint(const Vec3& near, float maxDistance = 2.0f, float clearance = 1.0f) const override;
     std::optional<Ground> groundAt(const Vec3& at, float farthest = 12.0f) const override;
@@ -110,6 +115,7 @@ public:
         return true;
     }
     std::optional<float> groundBelow(const Vec3& at) const override;
+    std::optional<bool> underRoof(const Vec3& at) const override;
     std::optional<float> waterSurface(const Vec3& at) const override;
     std::optional<std::uint32_t> areaAt(const Vec3& at) const override;
 
@@ -117,6 +123,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     std::atomic<bool> useRoads_{true};
+    std::atomic<bool> tall_{false};
     std::atomic<bool> avoidWater_{true};
     std::vector<Avoided> avoiding_;
 };

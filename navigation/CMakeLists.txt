@@ -9,6 +9,8 @@ og_add_module(navigation
         StuckDetector.cpp
         StuckRecovery.cpp
         Navigator.cpp
+        Lifts.cpp
+        Ships.cpp
         Avoidance.cpp
         ClientGeometry.cpp
     DEPS

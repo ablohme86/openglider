@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include "og/world/GameNames.h"
 #include "og/core/QuestTargets.h"
 #include "og/world/QuestGivers.h"
 #include "og/world/ZoneBounds.h"
@@ -40,6 +41,9 @@ namespace og
 // it sells and buys only for those exalted with its race, so a bags-full trip
 // to one ends at a window that never opens. Never chosen to sell or repair at.
 bool isMountVendor(std::string_view subName);
+// A vendor of a holiday or of the Darkmoon Faire ("Lunar Festival Vendor",
+// "Hallow's End Treats"): in the data all year, there only while it lasts.
+bool isEventVendor(std::string_view name, std::string_view subName);
 // The class an NPC trains by its title: "Paladin" of "Paladin Trainer". Not a
 // "Demon Trainer", "Pet Trainer" or a profession's ("Junior Mining Trainer").
 std::optional<std::string> trainerClass(std::string_view subName);
@@ -79,6 +83,10 @@ public:
     using MapOfZone = std::function<std::optional<std::uint32_t>(std::uint32_t zone)>;
 
     bool load(const Files& files, MapOfZone mapOfZone, std::string* error = nullptr);
+    // The game's names in the client's language: quest titles and the names
+    // of NPCs, items and objects as the client shows them, in its quest log,
+    // tracker and windows. Those it has none for stay English.
+    void useGameNames(const GameNames& names);
     bool loadFromDb(const std::filesystem::path& dbPath, MapOfZone mapOfZone, std::string* error = nullptr);
     const std::string* itemName(std::uint32_t itemId) const override;
     // For tests: the files' contents instead.
@@ -107,9 +115,12 @@ public:
     // "The Great Outdoors" and that to "Camping 101: Cooking" (and the other
     // professions). Talking to trainers the bot has no use for.
     bool isCampingQuest(std::uint32_t questId) const;
+    // A quest the bot cannot do, by its name: "Kyle's Gone Missing!" has Kyle
+    // the dog found and fed a treat as he runs about Bloodhoof Village.
+    bool isQuestTheBotCannotDo(std::uint32_t questId) const;
     bool isAutoIgnored(std::uint32_t questId) const override
     {
-        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId);
+        return isDungeonQuest(questId) || isEliteQuest(questId) || isCampingQuest(questId) || isQuestTheBotCannotDo(questId);
     }
     void setEliteEntries(std::shared_ptr<const std::unordered_set<std::uint32_t>> entries) override
     {
@@ -209,6 +220,10 @@ private:
     std::unordered_map<std::uint32_t, std::string> npcNames_;
     std::unordered_map<std::uint32_t, float> npcLevels_; // halfway between its min and max level
     std::unordered_map<std::uint32_t, std::string> itemNames_;
+    // Names in another language than the quest data's own (useGameNames): a
+    // tracker line holding a name counts where none is the name itself -
+    // "已殺死 狗頭人勞工", "Koboldarbeiter getötet".
+    bool localized_ = false;
     std::unordered_map<std::uint32_t, std::string> allItemNames_; // item_names.json
     std::unordered_map<std::uint32_t, std::uint32_t> subzones_;   // subzones.json
     // The zone a subzone lies in, by the data; og::canonicalZone's guess where

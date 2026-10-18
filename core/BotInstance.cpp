@@ -331,6 +331,8 @@ void BotInstance::tick()
     navigation->setUseRoads(config_.useRoads && !ghost && !(!config_.quest.enabled && engine_.currentName() == "Navigation"));
     // Over a bridge rather than through the water - but not on a corpse run.
     navigation->setAvoidWater(!ghost);
+    // A tauren (race 6) is too tall for the low eaves others pass under.
+    navigation->setTall(seen && seen->player.race == 6);
     navigator_.setSway(config_.humanizer.enabled ? config_.humanizer.sway : 0.0f);
 
     if (config_.usePathfinding && engine_.state() != EngineState::Paused && !pathfindingOrigin_)
@@ -749,13 +751,22 @@ void BotInstance::markUnderRoof(const GameSnapshot& s)
         }
         else
         {
-            // Ground straight over the mob, from a little over its head to a
-            // hill a hundred yards high: the rock over a mine, a cave.
-            // A map tile that cannot be built: not known, so open sky.
+            // The map's own word on it first: something solid over the ground
+            // the mob stands on - a house's roof, a cave's rock. Then ground
+            // straight over the mob, from a little over its head to a hill a
+            // hundred yards high: the rock over a mine, a cave. A map tile that
+            // cannot be built: not known, so open sky.
             try
             {
+                roofed = map.underRoof(u.position).value_or(false);
+
                 for (const float up : {20.0f, 50.0f, 110.0f})
                 {
+                    if (roofed)
+                    {
+                        break;
+                    }
+
                     const auto ground = map.groundBelow({u.position.x, u.position.y, u.position.z + up});
 
                     if (ground && *ground > u.position.z + 6.0f)
@@ -1797,7 +1808,7 @@ std::vector<std::string> BotInstance::pullActionsOffBars() const
 void BotInstance::updateStatus()
 {
     std::lock_guard lock(statusMutex_);
-    status_.behavior = engine_.currentName();
+    status_.behavior = engine_.onTaxi() ? std::string("Flying") : engine_.currentName();
     status_.objective = objectives_.describe();
     status_.lastAction = actions_.lastAction().value_or("");
     status_.profile = profile_ ? profile_->name : "";

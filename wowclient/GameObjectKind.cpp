@@ -45,6 +45,11 @@ bool containsAny(const std::string& s, std::initializer_list<const char*> words)
 
 } // namespace
 
+bool keptAtAnyDistance(const GameObjectState& object)
+{
+    return object.kind == GameObjectKind::Transport || object.kind == GameObjectKind::Ship || object.name.find("Elevator") != std::string::npos || object.name.find("Lift") != std::string::npos;
+}
+
 GameObjectKind classifyGameObject(std::uint8_t type, const std::string& name)
 {
     switch (type)
@@ -55,6 +60,10 @@ GameObjectKind classifyGameObject(std::uint8_t type, const std::string& name)
         return GameObjectKind::FishingHole;
     case c::GoTypeDoor:
         return GameObjectKind::Door;
+    case c::GoTypeTransport:
+        return GameObjectKind::Transport;
+    case c::GoTypeMoTransport:
+        return GameObjectKind::Ship;
     case c::GoTypeChest:
         if (containsAny(name, {"Vein", "Deposit", "Lode"}))
         {

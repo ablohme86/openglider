@@ -52,4 +52,8 @@ std::filesystem::path executableDirectory();
 // configured development data directory. Shared by apps and data readers.
 std::filesystem::path resolveDataFile(const std::string& path);
 
+// The client's language from its WTF/Config.wtf: SET textLocale "deDE".
+// enUS where it says none.
+std::string textLocaleOf(std::string_view configWtf);
+
 } // namespace og
