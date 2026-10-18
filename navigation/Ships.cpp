@@ -17,6 +17,7 @@
 #include "og/navigation/Ships.h"
 
 #include <algorithm>
+#include <format>
 
 namespace og
 {
@@ -160,6 +161,51 @@ std::vector<Vec3> ShipWatch::docks(Guid guid) const
                 out.push_back(dock);
             }
         }
+    }
+
+    return out;
+}
+
+std::string ShipLog::header()
+{
+    return "time_ms,map,guid,entry,name,x,y,z,state,player_x,player_y,player_z,distance";
+}
+
+std::vector<std::string> ShipLog::lines(const GameSnapshot& snapshot, const ShipWatch& watch, std::int64_t wallMs)
+{
+    std::vector<std::string> out;
+
+    for (const auto& o : snapshot.objects)
+    {
+        if (o.kind != GameObjectKind::Ship)
+        {
+            continue;
+        }
+
+        const auto state = watch.state(o.guid).value_or(ShipState::Moving);
+        const auto at = writtenAt_.find(o.guid);
+        const auto was = stateWritten_.find(o.guid);
+        const bool due = at == writtenAt_.end() || snapshot.timestamp - at->second >= kEvery;
+        const bool changed = was == stateWritten_.end() || was->second != state;
+
+        if (!due && !changed)
+        {
+            continue;
+        }
+
+        writtenAt_[o.guid] = snapshot.timestamp;
+        stateWritten_[o.guid] = state;
+        // A name with a comma or a quote in it, quoted as CSV quotes.
+        std::string name = o.name;
+
+        for (std::size_t q = name.find('"'); q != std::string::npos; q = name.find('"', q + 2))
+        {
+            name.insert(q, 1, '"');
+        }
+
+        const auto& p = snapshot.player.position;
+        out.push_back(std::format("{},{},0x{:016X},{},\"{}\",{:.2f},{:.2f},{:.2f},{},{:.2f},{:.2f},{:.2f},{:.1f}", wallMs, snapshot.mapId.value_or(0), o.guid, o.entry, name, o.position.x, o.position.y, o.position.z,
+                                  toString(state), p.x, p.y, p.z, distance(p, o.position)));
     }
 
     return out;

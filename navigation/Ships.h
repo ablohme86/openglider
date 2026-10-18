@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace og
@@ -73,6 +74,24 @@ private:
     };
 
     std::map<Guid, Seen> seen_;
+};
+
+// The ships' and zeppelins' positions as CSV lines, once a second each and at
+// every change of state: their routes, docks and timetables measured, for
+// travel between the continents.
+class ShipLog
+{
+public:
+    static constexpr Duration kEvery{1000};
+
+    // The line naming the columns.
+    static std::string header();
+    // The lines for this snapshot; `wallMs` the wall clock's milliseconds.
+    std::vector<std::string> lines(const GameSnapshot& snapshot, const ShipWatch& watch, std::int64_t wallMs);
+
+private:
+    std::map<Guid, TimePoint> writtenAt_;
+    std::map<Guid, ShipState> stateWritten_;
 };
 
 } // namespace og
