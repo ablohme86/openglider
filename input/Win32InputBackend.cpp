@@ -60,7 +60,8 @@ bool Win32InputBackend::isConnected() const
         hwnd_ = win32::findGameWindow(processId_);
     }
 
-    return hwnd_ != nullptr;
+    // Gone again before the next look: not connected meanwhile.
+    return hwnd_ && IsWindow(static_cast<HWND>(hwnd_));
 }
 
 void Win32InputBackend::doKeyDown(Key key)

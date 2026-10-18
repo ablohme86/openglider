@@ -840,8 +840,11 @@ constexpr std::string_view kCameraBack = "if _cz then CameraZoomOut(_cz) _cz=nil
 
 bool BotContext::zoomInForClick(int clicksMade)
 {
-    // Turning round goes with the camera out.
-    if (turningRound(turnGuid_) || turningRound(npcTurnGuid_))
+    // Turning round goes with the camera out. Not one left off half way (a
+    // fight, the NPC gone): that would hold the camera out for every corpse after.
+    const TimePoint at = now();
+
+    if ((turningRound(turnGuid_) && at - turnLastSeek_ <= kTurnForgetAfter) || (turningRound(npcTurnGuid_) && at - npcTurnLastSeek_ <= kTurnForgetAfter))
     {
         return false;
     }
