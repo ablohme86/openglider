@@ -18,6 +18,9 @@
 
 #include "og/common/Sqlite.h"
 
+#include <algorithm>
+#include <map>
+
 
 namespace og
 {
@@ -82,6 +85,77 @@ bool GameNames::load(const std::filesystem::path& worldDb, const std::string& lo
     }
 
     return !empty();
+}
+
+std::optional<std::string> GameNames::localeOfNpcNames(const std::filesystem::path& worldDb, const std::vector<std::pair<std::uint32_t, std::string>>& seen, int fewest, std::string* error)
+{
+    SqliteDb db;
+
+    if (!db.openReadOnly(worldDb, error))
+    {
+        return std::nullopt;
+    }
+
+    std::map<std::string, int> votes;
+    int known = 0;
+
+    try
+    {
+        auto english = db.prepare("SELECT 1 FROM npcs WHERE id = ? AND name = ?");
+        auto other = db.prepare("SELECT locale FROM l10n_npcs WHERE id = ? AND name = ?");
+
+        for (const auto& [id, name] : seen)
+        {
+            if (id == 0 || name.empty())
+            {
+                continue;
+            }
+
+            bool any = false;
+            english.reset();
+            english.bindUint32(1, id);
+            english.bindText(2, name);
+
+            // The English name, kept in some languages (Rejold Barleybrew is
+            // that in German too): English.
+            if (english.step())
+            {
+                ++votes["enUS"];
+                ++known;
+                continue;
+            }
+
+            // zhCN and zhTW, or esES and esMX, may share a name: each counts.
+            other.reset();
+            other.bindUint32(1, id);
+            other.bindText(2, name);
+
+            while (other.step())
+            {
+                ++votes[other.columnString(0)];
+                any = true;
+            }
+
+            known += any ? 1 : 0;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        if (error)
+        {
+            *error = e.what();
+        }
+
+        return std::nullopt;
+    }
+
+    if (known < fewest)
+    {
+        return std::nullopt;
+    }
+
+    const auto best = std::max_element(votes.begin(), votes.end(), [](const auto& a, const auto& b) { return a.second < b.second; });
+    return best->first;
 }
 
 namespace

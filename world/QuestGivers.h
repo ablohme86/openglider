@@ -19,6 +19,8 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -83,6 +85,19 @@ public:
     }
 
     const Quest* find(std::uint32_t id) const;
+    // The quests' names in the client's language (QuestSource::useGameNames):
+    // the offers are looked for by them in the NPC's window. `nameOf` gives
+    // nullopt where a quest keeps its own.
+    void rename(const std::function<std::optional<std::string>(std::uint32_t id)>& nameOf)
+    {
+        for (auto& [id, quest] : quests_)
+        {
+            if (auto name = nameOf(id); name && !name->empty())
+            {
+                quest.name = std::move(*name);
+            }
+        }
+    }
     // The quests this NPC offers the character: for its race, class and level,
     // not in the log, and not done - as far as the log and Character::done
     // tell, since what was handed in before is not known: the quests the
