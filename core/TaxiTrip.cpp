@@ -42,7 +42,7 @@ std::optional<Continent> continent(std::uint32_t mapId)
     switch (mapId)
     {
     case 0:
-        return Continent{18171.97f, -22569.21f, 11176.34f, -15973.34f};
+        return Continent{4910.0f, -7150.0f, 5840.0f, -17240.0f};
     case 1:
         return Continent{17066.6f, -19733.2f, 12799.9f, -11733.3f};
     default:
@@ -145,7 +145,7 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
         }
     }
 
-    return apart(onMap(nearest->second), placed(*wanted)) < 0.05f ? std::optional<int>{nearest->first} : std::nullopt;
+    return apart(onMap(nearest->second), placed(*wanted)) < 0.08f ? std::optional<int>{nearest->first} : std::nullopt;
 }
 
 TaxiTrip::Status TaxiTrip::fail(BotContext& ctx, std::string why)
@@ -236,6 +236,24 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
 
         if (now - clickedAt_ < kAnswer || now - mapSeenAt_ < kMapSettles)
         {
+            return Status::Running;
+        }
+
+        if (ctx.provider && ctx.provider->supportsLua())
+        {
+            const std::string script = std::format(
+                "local cost={};"
+                "local num=NumTaxiNodes();"
+                "for i=1,num do "
+                "if TaxiNodeGetType(i)=='REACHABLE' and (cost==0 or TaxiNodeCost(i)==cost) then "
+                "TakeTaxiNode(i);break end end",
+                plan_.cost);
+            ctx.runScript(script);
+            ++clicks_;
+            clickedAt_ = now;
+            stage_ = Stage::Flying;
+            lastPosition_ = pos;
+            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
             return Status::Running;
         }
 
