@@ -342,7 +342,46 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
     // A gossip first, where it has one: the line to fly by.
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        const auto known = flightGossipLines(*ctx.provider);
+        if (ctx.provider->supportsLua())
+        {
+            constexpr std::string_view kChooseFlight =
+                "if C_GossipInfo and C_GossipInfo.GetOptions then "
+                "for i,v in ipairs(C_GossipInfo.GetOptions()) do "
+                "local t=string.lower(v.name or '') local k=string.lower(v.type or '') "
+                "if k=='taxi' or string.find(t,'fly') or string.find(t,'flight') then "
+                "if C_GossipInfo.SelectOptionByIndex then C_GossipInfo.SelectOptionByIndex(i) "
+                "else C_GossipInfo.SelectOption(v.gossipOptionID) end break end end "
+                "elseif GetGossipOptions then "
+                "local o={GetGossipOptions()} "
+                "for i=1,#o,2 do "
+                "if string.lower(o[i+1] or '')=='taxi' then SelectGossipOption(math.floor((i+1)/2)) break end end end";
+            ctx.runScript(kChooseFlight);
+            gossipChosen_ = true;
+            talkedAt_ = now;
+            return Status::Running;
+        }
+
+        std::vector<UiFrame> gossipButtons;
+        for (int i = 1; i <= 16; ++i)
+        {
+            if (const auto btn = ctx.provider->uiFrame(std::format("GossipTitleButton{}", i)); btn && btn->visible)
+            {
+                gossipButtons.push_back(*btn);
+            }
+        }
+
+        auto known = flightGossipLines(*ctx.provider);
+
+        // If GossipTitleButtons are present, filter `known` so that only lines
+        // overlapping an actual gossip button are kept (ruling out the NPC greeting text).
+        if (!gossipButtons.empty())
+        {
+            std::erase_if(known, [&](const UiFrame& line) {
+                return std::none_of(gossipButtons.begin(), gossipButtons.end(), [&](const UiFrame& btn) {
+                    return std::abs(line.centerY() - btn.centerY()) < 0.02f || (line.top >= btn.top - 0.01f && line.bottom <= btn.bottom + 0.01f);
+                });
+            });
+        }
 
         if (known.size() == 1 && clickAt(ctx, known.front()))
         {
@@ -353,7 +392,30 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
 
         if (known.size() > 1)
         {
-            ctx.log.info(logcat::Move, "flight: {} of the flight master's gossip lines have a word to fly by", known.size());
+            const auto topMost = std::min_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+            const auto bottomMost = std::max_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+            if (known.size() == 2 && bottomMost->top > topMost->bottom)
+            {
+                ctx.log.info(logcat::Move, "flight: 2 lines with words to fly by - choosing the lower option below the greeting");
+                if (clickAt(ctx, *bottomMost))
+                {
+                    gossipChosen_ = true;
+                    talkedAt_ = now;
+                    return Status::Running;
+                }
+            }
+            else
+            {
+                ctx.log.info(logcat::Move, "flight: {} of the flight master's gossip lines have a word to fly by", known.size());
+            }
+        }
+
+        if (gossipButtons.size() == 1 && clickAt(ctx, gossipButtons.front()))
+        {
+            ctx.log.info(logcat::Move, "flight: clicked GossipTitleButton1 to show flight map");
+            gossipChosen_ = true;
+            talkedAt_ = now;
+            return Status::Running;
         }
 
         // None of those words, or more than one line with one: a flight

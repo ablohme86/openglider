@@ -20,6 +20,7 @@
 
 #include "og/core/Humanizer.h"
 #include "og/core/IBotBehavior.h"
+#include "og/core/TaxiTrip.h"
 #include "og/state/IGameStateProvider.h"
 
 #include <memory>
@@ -1090,7 +1091,8 @@ private:
         Travelling,
         Opening,
         Gossip,
-        Training
+        Training,
+        Returning
     };
 
     BehaviorStatus finish(BotContext& ctx, const std::string& reason, bool failed);
@@ -1108,6 +1110,10 @@ private:
     Guid npc_ = 0;
     TimePoint started_{}, stageStarted_{}, stepAt_{};
     std::optional<Vec3> progressFrom_;
+    std::optional<Vec3> tripFrom_;
+    std::optional<TaxiTrip> taxiTrip_;
+    bool taxiChecked_ = false;
+    std::size_t taxiKnown_ = 0;
     int opens_ = 0;
     int rightClicks_ = 0;
     bool mouseTried_ = false;

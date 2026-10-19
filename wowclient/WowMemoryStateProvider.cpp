@@ -1572,12 +1572,13 @@ void WowMemoryStateProvider::ensureSpellErrorHook()
     // "N R M": not-ready refusals, out-of-range / line-of-sight ones, and moving refusals.
     // Earlier versions only counted N or N R; upgrade if an existing session carries it.
     if (executeLua("if _OG_SE and not _OG_SE2 then _OG_SE:UnregisterAllEvents() end "
-                   "if not _OG_SE2 or not _OG_SE2_M then "
+                   "if not _OG_SE2 or _OG_SE2_V~=2 then "
                    "if not _OG_SE2 then _OG_SE2=CreateFrame('Frame') end "
                    "_OG_SE2_N=_OG_SE2_N or 0 "
                    "_OG_SE2_R=_OG_SE2_R or 0 "
-                   "_OG_SE2_M=0 "
-                   "RegisterCVar('og_spell_errors2', '0 0 0') "
+                   "_OG_SE2_M=_OG_SE2_M or 0 "
+                   "_OG_SE2_V=2 "
+                   "RegisterCVar('og_spell_errors2', _OG_SE2_N..' '.._OG_SE2_R..' '.._OG_SE2_M) "
                    "_OG_SE2:RegisterEvent('UI_ERROR_MESSAGE') "
                    "_OG_SE2:SetScript('OnEvent', function(self, event, a1, a2) "
                    "local msg = type(a1)=='string' and a1 or (type(a2)=='string' and a2 or '') "

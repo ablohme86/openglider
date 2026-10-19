@@ -102,7 +102,7 @@ public:
 
     bool wantsCombat(CombatContext& ctx) override
     {
-        return select("combat", ctx) != nullptr;
+        return select("combat", ctx, nullptr, nullptr, true) != nullptr;
     }
 
     bool onCombat(CombatContext& ctx) override
@@ -131,7 +131,7 @@ public:
 
     // Dry run: the rule that would fire right now, or nullptr; only rules
     // whose action `allowed` lets through, where it is given.
-    const script::Rule* select(std::string_view block, CombatContext& ctx, std::size_t* ruleIndex = nullptr, const std::function<bool(std::string_view)>* allowed = nullptr);
+    const script::Rule* select(std::string_view block, CombatContext& ctx, std::size_t* ruleIndex = nullptr, const std::function<bool(std::string_view)>* allowed = nullptr, bool ignoreToggleCooldown = false);
 
     const script::Program& program() const
     {

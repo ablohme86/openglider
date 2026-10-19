@@ -252,8 +252,19 @@ void TrainerBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
         row_ = 0;
         rowClicked_ = trainClicked_ = false;
         trainClicks_ = learned_ = 0;
+        if (!tripFrom_)
+        {
+            tripFrom_ = s.player.position;
+        }
+        taxiTrip_.reset();
+        taxiChecked_ = false;
+        taxiKnown_ = 0;
         ctx.log.info(logcat::Profile, "train abilities: going to {} ({:.0f} yd)", trainer_->name, distance2D(s.player.position, trainer_->position));
         ctx.objectives.push(Objective{"Train", 0, trainer_->position});
+    }
+    else if (stage_ == Stage::Returning)
+    {
+        stageStarted_ = ctx.now();
     }
     else if (stage_ != Stage::Travelling)
     {
@@ -283,6 +294,11 @@ BehaviorStatus TrainerBehavior::finish(BotContext& ctx, const std::string& reaso
     ctx.restoreCamera();
     ctx.objectives.pop("Train");
     ctx.combat.defendOnly = false;
+    taxiTrip_.reset();
+    taxiChecked_ = false;
+    taxiKnown_ = 0;
+    tripFrom_.reset();
+    stage_ = Stage::Travelling;
 
     for (const auto* close : {"ClassTrainerFrameCloseButton", "GossipFrameCloseButton"})
     {
@@ -391,6 +407,35 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
     {
     case Stage::Travelling:
     {
+        if (taxiTrip_)
+        {
+            const auto status = taxiTrip_->tick(s, ctx);
+            if (status == TaxiTrip::Status::Landed)
+            {
+                ctx.log.info(logcat::Profile, "train abilities: landed from flight - walking to {}", trainer_->name);
+                taxiTrip_.reset();
+                ctx.navigator.stop();
+                ctx.movement.stop();
+                started_ = now;
+                progressFrom_ = s.player.position;
+            }
+            else if (status == TaxiTrip::Status::Failed)
+            {
+                ctx.log.warn(logcat::Profile, "train abilities: flight failed ({}) - continuing on foot", taxiTrip_->why());
+                taxiTrip_.reset();
+                ctx.navigator.stop();
+                ctx.movement.stop();
+                started_ = now;
+                progressFrom_ = s.player.position;
+            }
+            else
+            {
+                started_ = now;
+                progressFrom_ = s.player.position;
+                return BehaviorStatus::Running;
+            }
+        }
+
         if (npc)
         {
             const float reach = closeIn_ ? kCloseIn : ctx.humanReach(ctx.config.interactDistance, npc->guid);
@@ -424,6 +469,24 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             }
 
             return BehaviorStatus::Running;
+        }
+
+        const auto known = s.player.knownTaxiNodes.value_or(std::vector<std::uint32_t>{});
+
+        if (!taxiTrip_ && (!taxiChecked_ || known.size() != taxiKnown_))
+        {
+            taxiChecked_ = true;
+            taxiKnown_ = known.size();
+
+            if (ctx.config.useFlightPaths && ctx.network() && s.mapId && known.size() >= 2 && distance2D(s.player.position, trainer_->position) > 400.0f)
+            {
+                if (const auto plan = ctx.network()->plan(*s.mapId, s.player.position, trainer_->position, known, s.player.money))
+                {
+                    ctx.log.info(logcat::Profile, "train abilities: flying to {} (saves {:.0f}s)", trainer_->name, plan->walkSeconds - plan->seconds);
+                    taxiTrip_.emplace(*plan, *s.mapId);
+                    return tick(s, ctx);
+                }
+            }
         }
 
         const NavStatus status = ctx.navigator.moveTo(s, trainer_->position, 3.0f, true);
@@ -567,9 +630,41 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 
     case Stage::Training:
     {
+        const auto planReturnFlight = [&]() -> bool
+        {
+            const auto known = s.player.knownTaxiNodes.value_or(std::vector<std::uint32_t>{});
+            if (tripFrom_ && ctx.config.useFlightPaths && ctx.network() && s.mapId && known.size() >= 2 && distance2D(s.player.position, *tripFrom_) > 400.0f)
+            {
+                if (const auto plan = ctx.network()->plan(*s.mapId, s.player.position, *tripFrom_, known, s.player.money))
+                {
+                    ctx.log.info(logcat::Profile, "train abilities: flying back to where training began (saves {:.0f}s)", plan->walkSeconds - plan->seconds);
+                    stage_ = Stage::Returning;
+                    stageStarted_ = stepAt_ = now;
+                    taxiTrip_.emplace(*plan, *s.mapId);
+                    for (const auto* close : {"ClassTrainerFrameCloseButton", "GossipFrameCloseButton"})
+                    {
+                        if (ctx.uiFrameVisible(close))
+                        {
+                            ctx.clickUiFrame(close);
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        };
+
         if (!ctx.uiFrameVisible("ClassTrainerFrame"))
         {
-            return learned_ > 0 ? finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false) : finish(ctx, "the trainer window closed", true);
+            if (learned_ > 0)
+            {
+                if (planReturnFlight())
+                {
+                    return BehaviorStatus::Running;
+                }
+                return finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false);
+            }
+            return finish(ctx, "the trainer window closed", true);
         }
 
         if (now - stepAt_ < kSettle && !rowClicked_ && !trainClicked_ && row_ == 0 && learned_ == 0)
@@ -615,6 +710,11 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
                 ctx.log.info(logcat::Profile, "train abilities: nothing {} - {}", rows.empty() ? "to learn now" : "the money allows", trainer_->name);
             }
 
+            if (planReturnFlight())
+            {
+                return BehaviorStatus::Running;
+            }
+
             return finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false);
         }
 
@@ -644,6 +744,36 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         }
 
         return BehaviorStatus::Running;
+    }
+
+    case Stage::Returning:
+    {
+        if (taxiTrip_)
+        {
+            const auto status = taxiTrip_->tick(s, ctx);
+            if (status == TaxiTrip::Status::Landed)
+            {
+                ctx.log.info(logcat::Profile, "train abilities: landed back from training flight");
+                taxiTrip_.reset();
+                ctx.navigator.stop();
+                ctx.movement.stop();
+                return finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false);
+            }
+            if (status == TaxiTrip::Status::Failed)
+            {
+                ctx.log.warn(logcat::Profile, "train abilities: return flight failed ({}) - walking back", taxiTrip_->why());
+                taxiTrip_.reset();
+                ctx.navigator.stop();
+                ctx.movement.stop();
+                return finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false);
+            }
+
+            started_ = now;
+            progressFrom_ = s.player.position;
+            return BehaviorStatus::Running;
+        }
+
+        return finish(ctx, std::format("learned {} spell{}", learned_, learned_ == 1 ? "" : "s"), false);
     }
     }
 

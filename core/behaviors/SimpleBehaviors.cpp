@@ -1409,6 +1409,24 @@ bool NavigationBehavior::circuitTick(const GameSnapshot& s, BotContext& ctx)
     }
 
     const Vec3& point = circuit_[circuitIndex_];
+
+    if (ctx.dangerAt(point) || ctx.fastRespawnAt(point))
+    {
+        ctx.log.info(logcat::Move, "build route: circuit point {} is in danger zone - going on to the next", circuitIndex_);
+        ++circuitIndex_;
+        circuitStraight_ = false;
+        circuitPointSince_ = now;
+
+        if (circuitIndex_ >= circuit_.size())
+        {
+            ++circuitLaps_;
+            ctx.log.info(logcat::Move, "build route: lap {} done - building the next circuit", circuitLaps_);
+            circuit_.clear();
+        }
+
+        return true;
+    }
+
     status = ctx.navigator.moveTo(s, point, radius, false, circuitStraight_);
 
     if (status == NavStatus::Unreachable && !circuitStraight_ && !ctx.navigator.provider().usesClientGeometry())
@@ -1452,10 +1470,28 @@ bool NavigationBehavior::circuitTick(const GameSnapshot& s, BotContext& ctx)
 
 bool NavigationBehavior::roamTick(const GameSnapshot& s, BotContext& ctx)
 {
+    if (roamTarget_ && (ctx.dangerAt(*roamTarget_) || !ctx.navigator.canStandAt(*roamTarget_)))
+    {
+        roamTarget_.reset();
+        roamPath_.clear();
+    }
+
     if (!roamTarget_)
     {
         const std::vector<Vec3>& route = ctx.route->points();
-        roamTarget_ = pickRoamPoint(route, s.player.position, ctx.obstacles, roamRandom_, ctx.config.roam.minLeg, 100, &ctx.navigator.provider(), ctx.config.roam.zone);
+        for (int attempts = 0; attempts < 10; ++attempts)
+        {
+            auto candidate = pickRoamPoint(route, s.player.position, ctx.obstacles, roamRandom_, ctx.config.roam.minLeg, 100, &ctx.navigator.provider(), ctx.config.roam.zone);
+            if (!candidate)
+            {
+                break;
+            }
+            if (!ctx.dangerAt(*candidate) && ctx.navigator.canStandAt(*candidate))
+            {
+                roamTarget_ = candidate;
+                break;
+            }
+        }
 
         if (!roamTarget_)
         {
@@ -1820,7 +1856,7 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
                 const Vec3& spot = target.spots[i];
 
                 // In a No Go zone: its mobs are not fought either.
-                if (ctx.obstacles && ctx.obstacles->avoids(spot))
+                if ((ctx.obstacles && ctx.obstacles->avoids(spot)) || ctx.dangerAt(spot) || ctx.fastRespawnAt(spot))
                 {
                     return false;
                 }

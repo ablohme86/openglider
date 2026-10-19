@@ -310,9 +310,11 @@ void BotInstance::tick()
     {
         tickOnce();
     }
-    catch (const std::runtime_error&)
+    catch (const std::runtime_error& e)
     {
-        if (!obstacles_.stopToken().stop_requested())
+        const std::string_view what = e.what();
+
+        if (!obstacles_.stopToken().stop_requested() || (what != "route calculation cancelled" && what != "map loading cancelled"))
         {
             throw;
         }
@@ -696,6 +698,9 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
         {
             dangerZones.push_back({f.at, FastRespawn::kRadius, f.name, false, true});
             context_.packZones.push_back({f.at, FastRespawn::kRadius, f.name + " (respawns at once)", false, AvoidZone::reachOf(FastRespawn::kRadius)});
+            std::erase_if(context_.pendingLoot, [&](const PendingLoot& p) {
+                return !p.inProgress && distance2D(p.position, f.at) <= FastRespawn::kRadius;
+            });
         }
     }
 

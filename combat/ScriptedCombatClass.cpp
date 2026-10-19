@@ -233,7 +233,7 @@ void ScriptedCombatClass::reportRuntimeError(Logger& log, const script::SourceLo
     }
 }
 
-const script::Rule* ScriptedCombatClass::select(std::string_view blockName, CombatContext& ctx, std::size_t* ruleIndex, const std::function<bool(std::string_view)>* allowed)
+const script::Rule* ScriptedCombatClass::select(std::string_view blockName, CombatContext& ctx, std::size_t* ruleIndex, const std::function<bool(std::string_view)>* allowed, bool ignoreToggleCooldown)
 {
     const script::Block* block = program_.block(std::string(blockName));
 
@@ -307,7 +307,7 @@ const script::Rule* ScriptedCombatClass::select(std::string_view blockName, Comb
             continue;
         }
 
-        if (!ctx.actions.isReady(rule.action))
+        if (!ctx.actions.isReady(rule.action) && !(ignoreToggleCooldown && (isAutoRepeatAction(rule.action) || isAutoAttackAction(rule.action))))
         {
             continue;
         }

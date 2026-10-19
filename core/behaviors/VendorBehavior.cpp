@@ -638,11 +638,18 @@ void VendorBehavior::buildReturnPath(const GameSnapshot& s, BotContext& ctx)
 
     if (tripFrom_ && !path_.empty() && distance2D(path_.back(), *tripFrom_) > kBackToTheRoute)
     {
-        static const std::vector<Vec3> noArea;
-        const auto& area = ctx.route ? ctx.route->points() : noArea;
-        const auto way = circuitWay(area, path_.back(), *tripFrom_, ctx.obstacles);
-        path_.insert(path_.end(), way.begin(), way.end());
-        ctx.log.info(logcat::Loot, "after the vendor route: back to where the trip began, {:.0f} yd on", distance2D(path_[homeFrom_ - 1], *tripFrom_));
+        if (ctx.dangerAt(*tripFrom_) || !ctx.navigator.canStandAt(*tripFrom_))
+        {
+            ctx.log.info(logcat::Loot, "where the vendor trip began is inside a danger zone - stopping return route outside");
+        }
+        else
+        {
+            static const std::vector<Vec3> noArea;
+            const auto& area = ctx.route ? ctx.route->points() : noArea;
+            const auto way = circuitWay(area, path_.back(), *tripFrom_, ctx.obstacles);
+            path_.insert(path_.end(), way.begin(), way.end());
+            ctx.log.info(logcat::Loot, "after the vendor route: back to where the trip began, {:.0f} yd on", distance2D(path_[homeFrom_ - 1], *tripFrom_));
+        }
     }
 
     totalTripDistance_ = remainingPathDistance(s.player.position, path_, 0);
@@ -777,21 +784,34 @@ bool VendorBehavior::walkPath(const GameSnapshot& s, BotContext& ctx)
 
     retryPathAt_.reset();
 
+    const bool homeLeg = stage_ == Stage::Returning && pathIndex_ >= homeFrom_;
+    if (homeLeg && (ctx.dangerAt(path_[pathIndex_]) || !ctx.navigator.canStandAt(path_[pathIndex_])))
+    {
+        ctx.log.info(logcat::Loot, "vendor return waypoint {} is in danger zone - completing return trip outside", pathIndex_);
+        pathIndex_ = path_.size();
+        return true;
+    }
+
     // The vendor route is the player's own, walked point by point whatever No Go
     // zones or learned obstacles say; only the way onto it goes round them, and
     // into one covering the point it joins the route at.
     const bool exact = onRoute;
-    const NavStatus status = ctx.navigator.moveTo(s, path_[pathIndex_], radius, false, exact, true);
+    const NavStatus status = ctx.navigator.moveTo(s, path_[pathIndex_], radius, false, exact, !homeLeg);
     detours_.update(s, ctx, pathIndex_, status == NavStatus::Recovering);
 
     if (status == NavStatus::Unreachable)
     {
         detours_.abandon();
         // A spot on the way back to where the trip began is only a way there:
-        // on to the next, as on the lead-in.
-        const bool homeLeg = stage_ == Stage::Returning && pathIndex_ >= homeFrom_;
+        // if unreachable, finish return trip.
+        if (homeLeg)
+        {
+            ctx.log.warn(logcat::Loot, "vendor return waypoint {} unreachable - finishing return trip", pathIndex_);
+            pathIndex_ = path_.size();
+            return true;
+        }
 
-        if (!homeLeg && (onRoute || pathIndex_ >= linkPoints_))
+        if (onRoute || pathIndex_ >= linkPoints_)
         {
             ++unreachableCount_;
 
@@ -1543,15 +1563,37 @@ BehaviorStatus VendorBehavior::tickMerchantUi(const GameSnapshot& s, BotContext&
     case UiStep::Confirm:
     {
         // "Are you sure...junk": the one dialog to say yes to. None comes when
-        // there was nothing to sell. Not known by its text - a zhTW client's
-        // "你將會售出所有垃圾物品..." went unanswered, and nothing was sold -
-        // but as the popup that came up after Sell All Junk was clicked: one
-        // open already (an invite, a duel) is never said yes to.
+        // there was nothing to sell. Identified across client languages
+        // (including zhTW's "你將會售出所有垃圾物品...") and only among popups
+        // that came up after Sell All Junk was clicked: an invite or duel is
+        // never said yes to.
+        const auto isJunkConfirm = [&](const std::string& popup)
+        {
+            const auto text = ctx.uiText(popup, popup + "Text");
+
+            if (!text)
+            {
+                return false;
+            }
+
+            const auto lower = [](char c) { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; };
+
+            for (std::string_view word : {"junk", "ramsch", "camelote", "objets gris", "chatarra", "sucata", "cianfrusagli", "хлам", "잡동사니", "垃圾"})
+            {
+                if (std::search(text->begin(), text->end(), word.begin(), word.end(), [&](char a, char b) { return lower(a) == lower(b); }) != text->end())
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
         for (int i = 1; i <= 4; ++i)
         {
             const std::string popup = "StaticPopup" + std::to_string(i);
 
-            if ((popupsBeforeJunk_ & (1u << (i - 1))) == 0 && ctx.uiFrameVisible(popup) && ctx.clickUiFrame(popup + "Button1"))
+            if ((popupsBeforeJunk_ & (1u << (i - 1))) == 0 && ctx.uiFrameVisible(popup) && isJunkConfirm(popup) && ctx.clickUiFrame(popup + "Button1"))
             {
                 return next(afterJunk);
             }

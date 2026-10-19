@@ -143,6 +143,7 @@ bool combatFiresAt(const UnitState& unit, const GameSnapshot& s, BotContext& ctx
 
     GameSnapshot moved = s;
     moved.player.isShooting = false;
+    moved.player.isAutoAttacking = false;
     const auto it = std::find_if(moved.units.begin(), moved.units.end(), [&](const UnitState& u) { return u.guid == unit.guid; });
 
     if (it == moved.units.end())
@@ -1090,7 +1091,7 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
     }
 
     // Walking in out of the gap between melee and shooting (leaveDeadZone).
-    if (deadZoneIn_ && (deadZoneOf_ != unit.guid || dist <= *deadZoneIn_ || ctx.now() - deadZoneAt_ > Duration(4000)))
+    if (deadZoneIn_ && (deadZoneOf_ != unit.guid || dist <= *deadZoneIn_ || ctx.now() - deadZoneAt_ > Duration(4000) || combatFiresAt(unit, *view, ctx, dist)))
     {
         deadZoneIn_.reset();
     }
