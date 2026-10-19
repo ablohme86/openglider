@@ -110,12 +110,12 @@ std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider)
     return found;
 }
 
-std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known)
+std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known, std::optional<std::uint32_t> from)
 {
     const auto c = continent(mapId);
     const float width = map.right - map.left, height = map.bottom - map.top;
 
-    if (!c || width <= 0 || height <= 0 || buttons.empty())
+    if (!c || width <= 0 || height <= 0 || buttons.empty() || (from && target == *from))
     {
         return std::nullopt;
     }
@@ -131,15 +131,47 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
         return std::nullopt;
     }
 
+    // The origin flight master's button cannot be the destination.
+    std::optional<int> fromButton;
+    if (from)
+    {
+        if (const auto* current = network.node(*from); current && current->mapId == mapId)
+        {
+            const auto it = std::min_element(buttons.begin(), buttons.end(), [&](const auto& a, const auto& b) {
+                return apart(onMap(a.second), placed(*current)) < apart(onMap(b.second), placed(*current));
+            });
+            if (it != buttons.end() && apart(onMap(it->second), placed(*current)) < 0.08f)
+            {
+                fromButton = it->first;
+            }
+        }
+    }
+
+    std::vector<std::pair<int, UiFrame>> candidates;
+    for (const auto& b : buttons)
+    {
+        if (!fromButton || b.first != *fromButton)
+        {
+            candidates.push_back(b);
+        }
+    }
+
+    if (candidates.empty())
+    {
+        return std::nullopt;
+    }
+
     // The button nearest where the flight point is...
-    const auto nearest = std::min_element(buttons.begin(), buttons.end(), [&](const auto& a, const auto& b) { return apart(onMap(a.second), placed(*wanted)) < apart(onMap(b.second), placed(*wanted)); });
+    const auto nearest = std::min_element(candidates.begin(), candidates.end(), [&](const auto& a, const auto& b) {
+        return apart(onMap(a.second), placed(*wanted)) < apart(onMap(b.second), placed(*wanted));
+    });
 
     // ...is it, if no other flight point learnt is nearer that button.
     for (const auto id : known)
     {
         const auto* other = network.node(id);
 
-        if (other && other->mapId == mapId && id != target && apart(onMap(nearest->second), placed(*other)) < apart(onMap(nearest->second), placed(*wanted)))
+        if (other && other->mapId == mapId && id != target && (!from || id != *from) && apart(onMap(nearest->second), placed(*other)) < apart(onMap(nearest->second), placed(*wanted)))
         {
             return std::nullopt;
         }
@@ -276,7 +308,7 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         }
 
         const auto known = s.player.knownTaxiNodes.value_or(std::vector<std::uint32_t>{});
-        const auto button = map && ctx.network() ? taxiButtonFor(plan_.to, mapId_, buttons, *map, *ctx.network(), known) : std::nullopt;
+        const auto button = map && ctx.network() ? taxiButtonFor(plan_.to, mapId_, buttons, *map, *ctx.network(), known, plan_.from) : std::nullopt;
 
         if (!button)
         {

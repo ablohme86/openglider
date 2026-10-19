@@ -394,7 +394,7 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
     }
 
     // The window up, however it came to be: trained from at once.
-    if (stage_ != Stage::Training && ctx.uiFrameVisible("ClassTrainerFrame"))
+    if (stage_ != Stage::Training && stage_ != Stage::Returning && ctx.uiFrameVisible("ClassTrainerFrame"))
     {
         stage_ = Stage::Training;
         stageStarted_ = stepAt_ = now;

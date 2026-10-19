@@ -638,9 +638,9 @@ void VendorBehavior::buildReturnPath(const GameSnapshot& s, BotContext& ctx)
 
     if (tripFrom_ && !path_.empty() && distance2D(path_.back(), *tripFrom_) > kBackToTheRoute)
     {
-        if (ctx.dangerAt(*tripFrom_) || !ctx.navigator.canStandAt(*tripFrom_))
+        if (ctx.dangerAt(*tripFrom_) || ctx.fastRespawnAt(*tripFrom_) || !ctx.navigator.canStandAt(*tripFrom_))
         {
-            ctx.log.info(logcat::Loot, "where the vendor trip began is inside a danger zone - stopping return route outside");
+            ctx.log.info(logcat::Loot, "where the vendor trip began is inside a danger or fast respawn zone - stopping return route outside");
         }
         else
         {
@@ -785,9 +785,9 @@ bool VendorBehavior::walkPath(const GameSnapshot& s, BotContext& ctx)
     retryPathAt_.reset();
 
     const bool homeLeg = stage_ == Stage::Returning && pathIndex_ >= homeFrom_;
-    if (homeLeg && (ctx.dangerAt(path_[pathIndex_]) || !ctx.navigator.canStandAt(path_[pathIndex_])))
+    if (homeLeg && (ctx.dangerAt(path_[pathIndex_]) || ctx.fastRespawnAt(path_[pathIndex_]) || !ctx.navigator.canStandAt(path_[pathIndex_])))
     {
-        ctx.log.info(logcat::Loot, "vendor return waypoint {} is in danger zone - completing return trip outside", pathIndex_);
+        ctx.log.info(logcat::Loot, "vendor return waypoint {} is in danger or fast respawn zone - completing return trip outside", pathIndex_);
         pathIndex_ = path_.size();
         return true;
     }
