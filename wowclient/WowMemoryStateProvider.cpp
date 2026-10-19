@@ -1583,7 +1583,7 @@ void WowMemoryStateProvider::ensureSpellErrorHook()
                    "local msg = type(a1)=='string' and a1 or (type(a2)=='string' and a2 or '') "
                    "if msg==ERR_SPELL_COOLDOWN or msg==ERR_ABILITY_COOLDOWN or msg==SPELL_FAILED_NOT_READY then "
                    "_OG_SE2_N=_OG_SE2_N+1 "
-                   "elseif msg==ERR_OUT_OF_RANGE or msg==SPELL_FAILED_OUT_OF_RANGE or msg==SPELL_FAILED_LINE_OF_SIGHT then "
+                   "elseif msg==ERR_OUT_OF_RANGE or msg==SPELL_FAILED_OUT_OF_RANGE or msg==SPELL_FAILED_LINE_OF_SIGHT or msg==SPELL_FAILED_TOO_CLOSE then "
                    "_OG_SE2_R=_OG_SE2_R+1 "
                    "elseif msg==ERR_SPELL_FAILED_MOVING or msg==SPELL_FAILED_MOVING or msg==[[Can't do that while moving]] then "
                    "_OG_SE2_M=_OG_SE2_M+1 "

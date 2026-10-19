@@ -46,7 +46,7 @@ struct GameSnapshot
     // "Spell is not ready yet" / "Ability is not ready yet" errors the client
     // showed since the previous snapshot: the last spell press did nothing.
     int spellNotReadyErrors = 0;
-    // "Out of range" / "Target not in line of sight" errors since the previous
+    // "Out of range" / "Target too close" / "Target not in line of sight" errors since the previous
     // snapshot: the last spell press did nothing, and repeating it from the
     // same spot would fail the same way.
     int spellOutOfReachErrors = 0;

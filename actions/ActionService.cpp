@@ -417,7 +417,7 @@ void ActionService::spellOutOfReach()
 
     cooldowns_.record(action, clock_.now(), kOutOfReachHold, Duration(0));
     notReady_.reset();
-    log_.info(logcat::Action, "{} out of range or line of sight - holding it back for {:.1f}s", action, toSeconds(kOutOfReachHold));
+    log_.info(logcat::Action, "{} out of range, too close or out of sight - holding it back for {:.1f}s", action, toSeconds(kOutOfReachHold));
 }
 
 void ActionService::hold(std::string_view action)
