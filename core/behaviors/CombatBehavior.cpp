@@ -916,10 +916,10 @@ void CombatBehavior::leaveDeadZone(const UnitState& unit, const GameSnapshot& s,
     // Not every tick: a step takes a moment, and the mob moves meanwhile.
     constexpr Duration kDeadZoneEvery{1500};
     // In to well within melee reach; out to a couple of yards past a minimum
-    // range (Auto Shot's 8), so a mob stepping after the pet does not take
-    // the hunter back into the gap at once.
+    // range (Auto Shot's 8, about 11 with the bodies), so a mob stepping
+    // after the pet does not take the hunter back into the gap at once.
     constexpr float kInTo = 3.0f;
-    constexpr std::array<float, 3> kOutTo{10.0f, 12.0f, 15.0f};
+    constexpr std::array<float, 3> kOutTo{8.0f + kBodiesReach + 2.0f, 8.0f + kBodiesReach + 4.0f, 8.0f + kBodiesReach + 7.0f};
     const TimePoint now = ctx.now();
 
     if (dist <= kMeleeReach || deadZoneIn_ || scriptMove_ || ctx.scriptMove || (deadZoneOf_ == unit.guid && now - deadZoneAt_ < kDeadZoneEvery))

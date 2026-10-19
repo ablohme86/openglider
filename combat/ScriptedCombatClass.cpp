@@ -469,6 +469,15 @@ bool ScriptedCombatClass::inRange(const std::string& action, CombatContext& ctx)
         return true;
     }
 
+    // The server keeps a minimum range between the two bodies, not their
+    // middles: each one's combat reach (some 1.5 yd for a player or an orc)
+    // comes on top. A hunter 9 yd from a Blackrock Outrunner was too close
+    // for Auto Shot and Serpent Sting, and pressed them for 9 s.
+    if (range.min > 0.0f)
+    {
+        range.min += kBodiesReach;
+    }
+
     return range.covers(distance2D(ctx.snapshot.player.position, target->position));
 }
 

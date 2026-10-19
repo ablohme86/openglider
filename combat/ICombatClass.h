@@ -92,6 +92,11 @@ inline std::optional<ScriptMove::Way> scriptMoveWay(std::string_view action)
 // The most a script may ask to be walked in one step.
 inline constexpr float kScriptMoveLongest = 40.0f;
 
+// What the two bodies add to a minimum range, middle to middle: the server
+// measures it from the one's edge to the other's - each combat reach, some
+// 1.5 yd for a player or a humanoid mob. Auto Shot's 8 yd is about 11.
+inline constexpr float kBodiesReach = 3.0f;
+
 struct CombatContext
 {
     const GameSnapshot& snapshot;
