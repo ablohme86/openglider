@@ -46,6 +46,16 @@
 #include <unordered_map>
 #include <utility>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace og::wowclient
 {
 
@@ -2001,7 +2011,23 @@ std::filesystem::path WowMemoryStateProvider::installDirectory() const
     {
         return config_.installDirectory;
     }
-#ifndef _WIN32
+#ifdef _WIN32
+    // The folder of the client's executable.
+    if (HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(memory_->pid())))
+    {
+        wchar_t image[MAX_PATH * 4]{};
+        DWORD size = static_cast<DWORD>(std::size(image));
+        std::filesystem::path folder;
+
+        if (QueryFullProcessImageNameW(process, 0, image, &size))
+        {
+            folder = std::filesystem::path(std::wstring(image, size)).parent_path();
+        }
+
+        CloseHandle(process);
+        return folder;
+    }
+#else
     // Clients run from their install directory, under wine too.
     std::error_code ec;
     auto cwd = std::filesystem::read_symlink(std::format("/proc/{}/cwd", memory_->pid()), ec);

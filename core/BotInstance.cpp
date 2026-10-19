@@ -303,6 +303,24 @@ void BotInstance::setCombatClass(std::unique_ptr<ICombatClass> combatClass)
 
 void BotInstance::tick()
 {
+    // Stopped while a route is worked out: the client's map gives it up with
+    // an exception (ClientNavigationProvider), which ends the tick - not the
+    // program. Stopping the command line on a vendor trip crashed it.
+    try
+    {
+        tickOnce();
+    }
+    catch (const std::runtime_error&)
+    {
+        if (!obstacles_.stopToken().stop_requested())
+        {
+            throw;
+        }
+    }
+}
+
+void BotInstance::tickOnce()
+{
     if (finished_)
     {
         return;
