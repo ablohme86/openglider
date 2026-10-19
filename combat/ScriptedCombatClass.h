@@ -100,6 +100,11 @@ public:
         pullExecutedRules_.clear();
     }
 
+    bool wantsCombat(CombatContext& ctx) override
+    {
+        return select("combat", ctx) != nullptr;
+    }
+
     bool onCombat(CombatContext& ctx) override
     {
         return run("combat", ctx);

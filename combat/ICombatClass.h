@@ -175,6 +175,15 @@ public:
     {
     }
 
+    // True when a combat rule would fire right now - asked with the mob moved,
+    // to find where the rotation reaches when it fires nowhere (a hunter at 6
+    // yards: Raptor Strike reaches 5, Auto Shot starts at 8).
+    virtual bool wantsCombat(CombatContext& ctx)
+    {
+        (void)ctx;
+        return false;
+    }
+
     virtual bool onCombat(CombatContext& ctx) = 0;
     virtual bool onRest(CombatContext& ctx) = 0;
 

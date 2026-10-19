@@ -494,6 +494,13 @@ private:
     bool takeScriptMove(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
     void stopScriptMove(BotContext& ctx);
     std::optional<ScriptMove> scriptMove_;
+    // Between melee reach and a minimum range (a hunter at 5-8 yards), where
+    // nothing in the rotation fires: stepped out of (leaveDeadZone).
+    void leaveDeadZone(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, float dist);
+    Guid deadZoneOf_ = 0;
+    TimePoint deadZoneAt_{};
+    std::optional<float> deadZoneIn_; // walking in to this distance
+    std::optional<Vec3> deadZoneBackFrom_; // where the last step back started
     Vec3 scriptMoveFrom_;
     TimePoint scriptMoveSince_{};
     Vec3 scriptMoveProgressAt_;

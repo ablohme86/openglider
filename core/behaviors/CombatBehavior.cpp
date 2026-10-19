@@ -21,6 +21,7 @@
 #include "og/core/behaviors/Behaviors.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace og
@@ -128,6 +129,32 @@ bool pullFiresAt(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, 
     return ctx.combatClass->wantsPull(cc);
 }
 
+// Would a combat rule fire with the mob `d` yards away, on the line it is on
+// now? Auto Shot or the wand's Shoot counts as firing where it reaches, on or
+// not: the client shoots again by itself once the mob is back in its reach.
+bool combatFiresAt(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, float d)
+{
+    const float dist = distance(s.player.position, unit.position);
+
+    if (!ctx.combatClass || dist <= 0.0f)
+    {
+        return false;
+    }
+
+    GameSnapshot moved = s;
+    moved.player.isShooting = false;
+    const auto it = std::find_if(moved.units.begin(), moved.units.end(), [&](const UnitState& u) { return u.guid == unit.guid; });
+
+    if (it == moved.units.end())
+    {
+        return false;
+    }
+
+    it->position = s.player.position + (unit.position - s.player.position) * (d / dist);
+    auto cc = ctx.combatContext(moved);
+    return ctx.combatClass->wantsCombat(cc);
+}
+
 // Would a pull rule fire with the mob closer? Only then does walking in help.
 // Mind Blast on its cooldown or held back after "Out of range", or too little
 // mana, fires nowhere: walking in anyway took a caster onto the mob, and a mob
@@ -229,6 +256,8 @@ void CombatBehavior::onExit(BotContext& ctx)
     pullFinished_ = false;
     pullActionExecuted_ = false;
     autoRepeatStartedAt_.reset();
+    deadZoneIn_.reset();
+    deadZoneBackFrom_.reset();
 
     if (ctx.combatClass)
     {
@@ -877,6 +906,84 @@ BehaviorStatus CombatBehavior::pull(const UnitState& unit, const GameSnapshot& s
     return BehaviorStatus::Running;
 }
 
+// Nothing in the rotation fires at this distance, though something would
+// nearer or farther: a hunter 6 yards from a mob hitting its pet - Raptor
+// Strike reaches 5, Auto Shot starts at 8 - stood there doing nothing for the
+// whole fight. A mob on the pet is stepped back from, out to where the shots
+// fire; one on us that does not come in is walked in to, to hit in melee.
+void CombatBehavior::leaveDeadZone(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, float dist)
+{
+    // Not every tick: a step takes a moment, and the mob moves meanwhile.
+    constexpr Duration kDeadZoneEvery{1500};
+    // In to well within melee reach; out to a couple of yards past a minimum
+    // range (Auto Shot's 8), so a mob stepping after the pet does not take
+    // the hunter back into the gap at once.
+    constexpr float kInTo = 3.0f;
+    constexpr std::array<float, 3> kOutTo{10.0f, 12.0f, 15.0f};
+    const TimePoint now = ctx.now();
+
+    if (dist <= kMeleeReach || deadZoneIn_ || scriptMove_ || ctx.scriptMove || (deadZoneOf_ == unit.guid && now - deadZoneAt_ < kDeadZoneEvery))
+    {
+        return;
+    }
+
+    // The client may be in the middle of starting Auto Shot.
+    if (autoRepeatStartedAt_ && now - *autoRepeatStartedAt_ < Duration(800))
+    {
+        return;
+    }
+
+    if (combatFiresAt(unit, s, ctx, dist))
+    {
+        return;
+    }
+
+    const bool onUs = unit.targetGuid == s.player.guid;
+
+    // Coming for us: it arrives on its own.
+    if (onUs && targetClosingIn(unit, s, now))
+    {
+        return;
+    }
+
+    const bool firesNearer = combatFiresAt(unit, s, ctx, kInTo);
+    std::optional<float> firesFrom;
+
+    for (const float d : kOutTo)
+    {
+        if (d > dist && combatFiresAt(unit, s, ctx, d))
+        {
+            firesFrom = d;
+            break;
+        }
+    }
+
+    // The last step back went nowhere (a wall behind): in instead.
+    const bool backBlocked = deadZoneOf_ == unit.guid && deadZoneBackFrom_ && distance2D(*deadZoneBackFrom_, s.player.position) < 1.0f;
+    const bool goBack = firesFrom && !backBlocked && (!onUs || !firesNearer);
+
+    if (!goBack && !firesNearer)
+    {
+        return;
+    }
+
+    deadZoneOf_ = unit.guid;
+    deadZoneAt_ = now;
+    deadZoneBackFrom_.reset();
+
+    if (goBack)
+    {
+        const float yards = *firesFrom - dist + 0.5f;
+        ctx.log.info(logcat::Combat, "{} {:.1f} yd off: too near to shoot, too far to hit - stepping back {:.0f} yd", unit.name, dist, yards);
+        deadZoneBackFrom_ = s.player.position;
+        ctx.scriptMove = ScriptMove{ScriptMove::Way::Backward, yards, std::format("out of the gap between melee and shooting: back {:.0f} yd", yards)};
+        return;
+    }
+
+    ctx.log.info(logcat::Combat, "{} {:.1f} yd off: too near to shoot, too far to hit - walking in to melee", unit.name, dist);
+    deadZoneIn_ = kInTo;
+}
+
 BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& s, BotContext& ctx)
 {
     if (s.player.isCasting || ctx.actions.isCasting())
@@ -982,6 +1089,18 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
         return BehaviorStatus::Running;
     }
 
+    // Walking in out of the gap between melee and shooting (leaveDeadZone).
+    if (deadZoneIn_ && (deadZoneOf_ != unit.guid || dist <= *deadZoneIn_ || ctx.now() - deadZoneAt_ > Duration(4000)))
+    {
+        deadZoneIn_.reset();
+    }
+
+    if (deadZoneIn_ && !s.player.isCasting && !ctx.actions.isCasting() && !backing_)
+    {
+        ctx.navigator.moveTo(s, unit.position, *deadZoneIn_);
+        return BehaviorStatus::Running;
+    }
+
     ctx.navigator.halt();
 
     // Backing up, the rotation waits: a cast would stop it, or fail moving.
@@ -995,10 +1114,14 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
     // Abilities need the target in front (WoW: 180 degree arc).
     const float delta = std::fabs(headingDelta(s.player.heading, s.player.position, unit.position));
 
+    bool fired = false;
+
     if (delta < 1.2f && ctx.combatClass)
     {
         if (ctx.combatClass->onCombat(cc))
         {
+            fired = true;
+
             if (ctx.actions.lastAction())
             {
                 const std::string_view act = *ctx.actions.lastAction();
@@ -1011,6 +1134,11 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
                 }
             }
         }
+    }
+
+    if (!fired && delta < 1.2f && !s.player.isCasting && !ctx.actions.isCasting() && !ctx.actions.onGlobalCooldown())
+    {
+        leaveDeadZone(unit, s, ctx, dist);
     }
 
     return BehaviorStatus::Running;
