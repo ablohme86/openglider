@@ -1295,6 +1295,9 @@ private:
     };
     UiStep uiStep_ = UiStep::Open;
     TimePoint uiStepAt_{};
+    // The StaticPopups open before Sell All Junk was clicked (bit i-1 for
+    // StaticPopup<i>): its confirmation is the one that was not.
+    unsigned popupsBeforeJunk_ = 0;
     TimePoint uiHoverStarted_{};
     std::set<std::uint64_t> visitedBagButtons_;
     // Slots looked at that still hold something (kept, or a sale that did not

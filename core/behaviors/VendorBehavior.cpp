@@ -1521,6 +1521,13 @@ BehaviorStatus VendorBehavior::tickMerchantUi(const GameSnapshot& s, BotContext&
                 ctx.log.info(logcat::Loot, "this client sells grey items only (Sell All Junk) - {} items are kept", config.sellCommon && config.sellUncommon ? "white and green" : config.sellCommon ? "white" : "green");
             }
 
+            popupsBeforeJunk_ = 0;
+
+            for (int i = 1; i <= 4; ++i)
+            {
+                popupsBeforeJunk_ |= ctx.uiFrameVisible("StaticPopup" + std::to_string(i)) ? 1u << (i - 1) : 0u;
+            }
+
             // Every grey goes, whatever the never-sell list says: one click
             // does that, and the bags are then gone through for the rest only.
             // Without tooltips the button is the only way to sell at all.
@@ -1534,11 +1541,20 @@ BehaviorStatus VendorBehavior::tickMerchantUi(const GameSnapshot& s, BotContext&
         }
 
     case UiStep::Confirm:
+    {
         // "Are you sure...junk": the one dialog to say yes to. None comes when
-        // there was nothing to sell.
-        if (ctx.clickDialog("junk"))
+        // there was nothing to sell. Not known by its text - a zhTW client's
+        // "你將會售出所有垃圾物品..." went unanswered, and nothing was sold -
+        // but as the popup that came up after Sell All Junk was clicked: one
+        // open already (an invite, a duel) is never said yes to.
+        for (int i = 1; i <= 4; ++i)
         {
-            return next(afterJunk);
+            const std::string popup = "StaticPopup" + std::to_string(i);
+
+            if ((popupsBeforeJunk_ & (1u << (i - 1))) == 0 && ctx.uiFrameVisible(popup) && ctx.clickUiFrame(popup + "Button1"))
+            {
+                return next(afterJunk);
+            }
         }
 
         if (now - uiStepAt_ > Duration(3000))
@@ -1547,6 +1563,7 @@ BehaviorStatus VendorBehavior::tickMerchantUi(const GameSnapshot& s, BotContext&
         }
 
         return BehaviorStatus::Running;
+    }
     case UiStep::OpenBags:
         if (!ctx.provider->uiBagSlots().empty())
         {
