@@ -218,7 +218,7 @@ const UnitState* TargetSelector::standingInTheWay(const GameSnapshot& s, const U
             continue;
         }
 
-        if (std::fabs(u.position.z - at.z) > config_.effectiveMaxHeightDifference() || (avoidedPosition_ && avoidedPosition_(u.position)))
+        if (std::fabs(u.position.z - at.z) > config_.effectiveMaxHeightDifference() || tooSteep(u, s) || (avoidedPosition_ && avoidedPosition_(u.position)))
         {
             continue;
         }

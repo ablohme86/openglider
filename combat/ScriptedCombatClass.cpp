@@ -134,6 +134,44 @@ bool isAutoRepeatAction(std::string_view action)
     return action.ends_with(".AutoShot") || action.ends_with(".Shoot");
 }
 
+bool isMeleePullAction(std::string_view action)
+{
+    if (isAutoAttackAction(action))
+    {
+        return true;
+    }
+
+    if (action.starts_with("Pet.") || action.starts_with("Player.") || action.starts_with("Move.") || action.starts_with("Target."))
+    {
+        return true;
+    }
+
+    constexpr std::string_view kMeleeAbilities[] = {
+        "Charge", "Intercept", "Intervene", "DeathGrip", "FeralCharge",
+        "SinisterStrike", "Backstab", "Ambush", "Garrote", "CheapShot",
+        "Gouge", "Riposte", "Rupture", "ExposeArmor", "KidneyShot",
+        "Mutilate", "Hemorrhage", "Shiv", "GhostlyStrike", "Eviscerate",
+        "Rend", "HeroicStrike", "Hamstring", "Overpower", "Slam",
+        "MortalStrike", "Bloodthirst", "ShieldSlam", "Revenge", "Cleave",
+        "Whirlwind", "Pummel", "Disarm", "ConcussionBlow", "ThunderClap",
+        "CrusaderStrike", "RaptorStrike", "WingClip", "MongooseBite",
+        "PlagueStrike", "DeathStrike", "BloodStrike", "Obliterate",
+        "ScourgeStrike", "HeartStrike", "RuneStrike", "Stormstrike",
+        "LavaLash", "PrimalStrike", "Claw", "Rake", "Maul", "Shred",
+        "Mangle", "Ravage", "Pounce", "Swipe", "Bash"
+    };
+
+    for (std::string_view m : kMeleeAbilities)
+    {
+        if (action == m || action.ends_with(m))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // The client reports the wand stopped a moment after the press. Pressing Shoot
 // again before then would turn it back on.
 constexpr Duration kWandStopSettle{1000};
@@ -186,6 +224,24 @@ ScriptedCombatClass::LoadResult ScriptedCombatClass::fromSource(std::string_view
     }
 
     std::unique_ptr<ScriptedCombatClass> cls(new ScriptedCombatClass(std::move(*parsed.program)));
+
+    if (actions)
+    {
+        for (const auto& [name, b] : actions->bindings())
+        {
+            if (b.range.limited())
+            {
+                cls->actionMaxRanges_[name] = b.range.max;
+            }
+        }
+        for (const auto& [name, b] : actions->info())
+        {
+            if (b.range.limited())
+            {
+                cls->actionMaxRanges_[name] = b.range.max;
+            }
+        }
+    }
 
     for (const auto& s : cls->program_.settings)
     {
@@ -603,10 +659,18 @@ bool ScriptedCombatClass::isRanged() const
     {
         for (const auto& rule : block->rules)
         {
-            if (!isAutoAttackAction(rule.action))
+            if (isMeleePullAction(rule.action))
             {
-                return true;
+                continue;
             }
+
+            const auto it = actionMaxRanges_.find(rule.action);
+            if (it != actionMaxRanges_.end() && it->second <= 5.0f)
+            {
+                continue;
+            }
+
+            return true;
         }
     }
 

@@ -147,20 +147,7 @@ bool BotContext::hasQuestLootNearby(const GameSnapshot& s, float maxDistance) co
 
         const UnitState* u = s.findUnit(p.guid);
 
-        if (u && !u->isTappedByOther && (u->isLootable || config.lootWithoutFlag) && questNeeds(u->entry) && distance(s.player.position, u->position) <= maxDistance)
-        {
-            return true;
-        }
-    }
-
-    for (const auto& u : s.units)
-    {
-        if (u.isAlive() || u.isPlayer || u.isCritter || u.isTappedByOther || u.entry == 0 || !u.isLootable)
-        {
-            continue;
-        }
-
-        if (questNeeds(u.entry) && distance(s.player.position, u.position) <= maxDistance)
+        if (u && !u->isTappedByOther && u->isLootable && questNeeds(u->entry) && distance(s.player.position, u->position) <= maxDistance)
         {
             return true;
         }

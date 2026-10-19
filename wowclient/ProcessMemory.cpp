@@ -241,27 +241,27 @@ bool ProcessMemory::attach(int pid)
         {
             const DWORD fallbackError = GetLastError();
 
-            // Try with only PROCESS_VM_READ
-            h = OpenProcess(PROCESS_VM_READ, FALSE, processId);
+            // Diagnose: kan vi hente grunnleggende prosessinformasjon eller lese minne alene?
+            HANDLE probe = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+            const DWORD queryError = probe ? ERROR_SUCCESS : GetLastError();
 
-            if (!h)
+            if (probe)
             {
-                const DWORD vmReadError = GetLastError();
-
-                // Diagnose: kan vi hente grunnleggende prosessinformasjon?
-                HANDLE probe = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
-                const DWORD queryError = probe ? ERROR_SUCCESS : GetLastError();
-
-                if (probe)
-                {
-                    CloseHandle(probe);
-                }
-
-                lastError_ = std::format(
-                    "OpenProcess({}): read+query={}, read+limited={}, read-only={}, limited-only={}",
-                    pid, firstError, fallbackError, vmReadError, queryError);
-                return false;
+                CloseHandle(probe);
             }
+
+            HANDLE vmProbe = OpenProcess(PROCESS_VM_READ, FALSE, processId);
+            const DWORD vmReadError = vmProbe ? ERROR_SUCCESS : GetLastError();
+
+            if (vmProbe)
+            {
+                CloseHandle(vmProbe);
+            }
+
+            lastError_ = std::format(
+                "OpenProcess({}): read+query={}, read+limited={}, read-only={}, limited-only={}",
+                pid, firstError, fallbackError, vmReadError, queryError);
+            return false;
         }
     }
 

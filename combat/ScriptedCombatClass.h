@@ -197,6 +197,7 @@ private:
     std::set<std::string> reportedUnbound_;
     std::optional<TimePoint> wandStopPressedAt_;
     std::set<std::size_t> pullExecutedRules_;
+    std::map<std::string, float, std::less<>> actionMaxRanges_;
 };
 
 } // namespace og
