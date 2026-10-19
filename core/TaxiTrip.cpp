@@ -316,24 +316,6 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
             return Status::Running;
         }
 
-        if (ctx.provider && ctx.provider->supportsLua())
-        {
-            const std::string script = std::format(
-                "local cost={};"
-                "local num=NumTaxiNodes();"
-                "for i=1,num do "
-                "if TaxiNodeGetType(i)=='REACHABLE' and (cost==0 or TaxiNodeCost(i)==cost) then "
-                "TakeTaxiNode(i);break end end",
-                plan_.cost);
-            ctx.runScript(script);
-            ++clicks_;
-            clickedAt_ = now;
-            stage_ = Stage::Flying;
-            lastPosition_ = pos;
-            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
-            return Status::Running;
-        }
-
         const auto map = ctx.provider ? ctx.provider->uiFrame("TaxiRouteMap") : std::nullopt;
         std::vector<std::pair<int, UiFrame>> buttons;
 
@@ -355,30 +337,64 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         const auto known = s.player.knownTaxiNodes.value_or(std::vector<std::uint32_t>{});
         const auto button = map && ctx.network() ? taxiButtonFor(plan_.to, mapId_, buttons, *map, *ctx.network(), known, plan_.from) : std::nullopt;
 
-        if (!button)
+        if (button)
         {
-            // Looked for again a while, the map still settling.
-            if (now - mapSeenAt_ < kMapLooked)
+            if (ctx.provider && ctx.provider->supportsLua())
             {
-                return Status::Running;
+                ctx.runScript(std::format("TakeTaxiNode({})", *button));
+            }
+            else
+            {
+                const auto frame = std::find_if(buttons.begin(), buttons.end(), [&](const auto& b) { return b.first == *button; })->second;
+                if (!clickAt(ctx, frame))
+                {
+                    return Status::Running;
+                }
             }
 
-            return fail(ctx, std::format("flight point {} not found on the flight map ({} shown)", plan_.to, buttons.size()));
+            ++clicks_;
+            clickedAt_ = now;
+            stage_ = Stage::Flying;
+            lastPosition_ = pos;
+            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} (button TaxiButton{})", plan_.from, plan_.to, *button);
+            return Status::Running;
         }
 
-        const auto frame = std::find_if(buttons.begin(), buttons.end(), [&](const auto& b) { return b.first == *button; })->second;
+        if (ctx.provider && ctx.provider->supportsLua())
+        {
+            const auto c = continent(mapId_);
+            const float tx = c ? (c->left - plan_.toPosition.y) / (c->left - c->right) : 0.0f;
+            const float ty = c ? (c->top - plan_.toPosition.x) / (c->top - c->bottom) : 0.0f;
+            const std::string script = std::format(
+                "local tx,ty={:.4f},{:.4f};"
+                "local cost={};"
+                "local num=NumTaxiNodes();"
+                "local best,bestDist=nil,999999;"
+                "for i=1,num do "
+                "if TaxiNodeGetType(i)=='REACHABLE' then "
+                "local x,y=TaxiNodePosition(i);"
+                "local d=(x-tx)*(x-tx)+(y-ty)*(y-ty);"
+                "if cost>0 and TaxiNodeCost(i)==cost then d=d*0.5 end;"
+                "if d<bestDist then bestDist=d;best=i end end end "
+                "if best and (bestDist<0.05*0.05 or (cost>0 and TaxiNodeCost(best)==cost)) then "
+                "TakeTaxiNode(best) end",
+                tx, ty, plan_.cost);
+            ctx.runScript(script);
+            ++clicks_;
+            clickedAt_ = now;
+            stage_ = Stage::Flying;
+            lastPosition_ = pos;
+            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
+            return Status::Running;
+        }
 
-        if (!clickAt(ctx, frame))
+        // Looked for again a while, the map still settling.
+        if (now - mapSeenAt_ < kMapLooked)
         {
             return Status::Running;
         }
 
-        ++clicks_;
-        clickedAt_ = now;
-        stage_ = Stage::Flying;
-        lastPosition_ = pos;
-        ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
-        return Status::Running;
+        return fail(ctx, std::format("flight point {} not found on the flight map ({} shown)", plan_.to, buttons.size()));
     }
 
     // The flight map shut: looked at anew when it opens again.
