@@ -46,6 +46,22 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
 // "ride" in it may be one of them.
 std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider);
 
+// A Lua script that selects the taxi/flight option in GossipFrame across WoW versions.
+inline constexpr std::string_view kChooseFlightLua =
+    "if C_GossipInfo and C_GossipInfo.GetOptions then "
+    "for i,v in ipairs(C_GossipInfo.GetOptions()) do "
+    "local t=string.lower(v.name or '') local k=string.lower(v.type or '') "
+    "if k=='taxi' or string.find(t,'fly') or string.find(t,'flight') then "
+    "if C_GossipInfo.SelectOptionByIndex then C_GossipInfo.SelectOptionByIndex(i) "
+    "else C_GossipInfo.SelectOption(v.gossipOptionID) end break end end "
+    "elseif GetGossipOptions then "
+    "local o={GetGossipOptions()} "
+    "for i=1,#o,2 do "
+    "if string.lower(o[i+1] or '')=='taxi' then SelectGossipOption(math.floor((i+1)/2)) break end end end";
+
+// Locates the UI frame of the flight gossip option to click, if uniquely identifiable.
+std::optional<UiFrame> flightGossipChoice(IGameStateProvider& provider);
+
 class TaxiTrip
 {
 public:

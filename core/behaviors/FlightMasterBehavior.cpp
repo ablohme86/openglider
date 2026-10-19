@@ -64,18 +64,7 @@ bool clickAt(BotContext& ctx, const UiFrame& frame)
     return true;
 }
 
-// The flight master's gossip, where it has one: the line that shows the
-// flight map ("Show me where I can fly.").
-constexpr std::string_view kChooseFlight = "if C_GossipInfo and C_GossipInfo.GetOptions then "
-                                           "for i,v in ipairs(C_GossipInfo.GetOptions()) do "
-                                           "local t=string.lower(v.name or '') local k=string.lower(v.type or '') "
-                                           "if k=='taxi' or string.find(t,'fly') or string.find(t,'flight') then "
-                                           "if C_GossipInfo.SelectOptionByIndex then C_GossipInfo.SelectOptionByIndex(i) "
-                                           "else C_GossipInfo.SelectOption(v.gossipOptionID) end break end end "
-                                           "elseif GetGossipOptions then "
-                                           "local o={GetGossipOptions()} "
-                                           "for i=1,#o,2 do "
-                                           "if string.lower(o[i+1] or '')=='taxi' then SelectGossipOption(math.floor((i+1)/2)) break end end end";
+// The flight map closed again once the flight path is learnt.
 constexpr std::string_view kCloseMap = "if CloseTaxiMap then CloseTaxiMap() end; if C_GossipInfo and C_GossipInfo.CloseGossip then C_GossipInfo.CloseGossip() elseif CloseGossip then CloseGossip() end";
 } // namespace
 
@@ -262,58 +251,19 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
     const bool lua = ctx.provider && ctx.provider->supportsLua();
 
     // A gossip first, where it has one: the flight line chosen once.
-    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
+    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
         if (lua)
         {
-            ctx.runScript(kChooseFlight);
+            ctx.runScript(kChooseFlightLua);
             gossipChosen_ = true;
             talkedAt_ = now;
             return BehaviorStatus::Running;
         }
 
-        if (ctx.provider)
+        if (const auto choice = flightGossipChoice(*ctx.provider))
         {
-            std::vector<UiFrame> gossipButtons;
-            for (int i = 1; i <= 16; ++i)
-            {
-                if (const auto btn = ctx.provider->uiFrame(std::format("GossipTitleButton{}", i)); btn && btn->visible)
-                {
-                    gossipButtons.push_back(*btn);
-                }
-            }
-
-            auto known = flightGossipLines(*ctx.provider);
-
-            if (!gossipButtons.empty())
-            {
-                std::erase_if(known, [&](const UiFrame& line) {
-                    return std::none_of(gossipButtons.begin(), gossipButtons.end(), [&](const UiFrame& btn) {
-                        return std::abs(line.centerY() - btn.centerY()) < 0.02f || (line.top >= btn.top - 0.01f && line.bottom <= btn.bottom + 0.01f);
-                    });
-                });
-            }
-
-            if (known.size() == 1 && clickAt(ctx, known.front()))
-            {
-                gossipChosen_ = true;
-                talkedAt_ = now;
-                return BehaviorStatus::Running;
-            }
-
-            if (known.size() == 2)
-            {
-                const auto topMost = std::min_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
-                const auto bottomMost = std::max_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
-                if (bottomMost->top > topMost->bottom && clickAt(ctx, *bottomMost))
-                {
-                    gossipChosen_ = true;
-                    talkedAt_ = now;
-                    return BehaviorStatus::Running;
-                }
-            }
-
-            if (gossipButtons.size() == 1 && clickAt(ctx, gossipButtons.front()))
+            if (clickAt(ctx, *choice))
             {
                 gossipChosen_ = true;
                 talkedAt_ = now;

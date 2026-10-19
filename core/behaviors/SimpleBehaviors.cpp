@@ -1300,10 +1300,23 @@ void NavigationBehavior::rejoinCircuit(const GameSnapshot& s, BotContext& ctx)
 
     for (std::size_t i = circuitIndex_ + 1; i < last; ++i)
     {
-        if (distance2D(pos, circuit_[i]) < distance2D(pos, circuit_[best]))
+        if (ctx.dangerAt(circuit_[i]) || ctx.fastRespawnAt(circuit_[i]))
+        {
+            continue;
+        }
+        if (ctx.dangerAt(circuit_[best]) || ctx.fastRespawnAt(circuit_[best]) || distance2D(pos, circuit_[i]) < distance2D(pos, circuit_[best]))
         {
             best = i;
         }
+    }
+
+    while (best < circuit_.size() && (ctx.dangerAt(circuit_[best]) || ctx.fastRespawnAt(circuit_[best])))
+    {
+        ++best;
+    }
+    if (best >= circuit_.size())
+    {
+        best = 0;
     }
 
     circuitIndex_ = best;
@@ -1397,7 +1410,15 @@ bool NavigationBehavior::circuitTick(const GameSnapshot& s, BotContext& ctx)
 
     if (circuitLeadInIndex_ < circuitLeadIn_.size())
     {
-        status = ctx.navigator.moveTo(s, circuitLeadIn_[circuitLeadInIndex_], radius, false);
+        const Vec3& leadIn = circuitLeadIn_[circuitLeadInIndex_];
+        if (ctx.dangerAt(leadIn) || ctx.fastRespawnAt(leadIn))
+        {
+            circuitLeadIn_.clear();
+            circuitLeadInIndex_ = 0;
+            return true;
+        }
+
+        status = ctx.navigator.moveTo(s, leadIn, radius, false);
 
         if (status == NavStatus::Arrived || status == NavStatus::Unreachable)
         {
@@ -1470,7 +1491,7 @@ bool NavigationBehavior::circuitTick(const GameSnapshot& s, BotContext& ctx)
 
 bool NavigationBehavior::roamTick(const GameSnapshot& s, BotContext& ctx)
 {
-    if (roamTarget_ && (ctx.dangerAt(*roamTarget_) || !ctx.navigator.canStandAt(*roamTarget_)))
+    if (roamTarget_ && (ctx.dangerAt(*roamTarget_) || ctx.fastRespawnAt(*roamTarget_) || !ctx.navigator.canStandAt(*roamTarget_)))
     {
         roamTarget_.reset();
         roamPath_.clear();
@@ -1486,7 +1507,7 @@ bool NavigationBehavior::roamTick(const GameSnapshot& s, BotContext& ctx)
             {
                 break;
             }
-            if (!ctx.dangerAt(*candidate) && ctx.navigator.canStandAt(*candidate))
+            if (!ctx.dangerAt(*candidate) && !ctx.fastRespawnAt(*candidate) && ctx.navigator.canStandAt(*candidate))
             {
                 roamTarget_ = candidate;
                 break;
@@ -1856,9 +1877,17 @@ bool NavigationBehavior::questTick(const GameSnapshot& s, BotContext& ctx)
                 const Vec3& spot = target.spots[i];
 
                 // In a No Go zone: its mobs are not fought either.
-                if ((ctx.obstacles && ctx.obstacles->avoids(spot)) || ctx.dangerAt(spot) || ctx.fastRespawnAt(spot))
+                if ((ctx.obstacles && ctx.obstacles->avoids(spot)) || ctx.dangerAt(spot))
                 {
                     return false;
+                }
+
+                if (const auto* fastRespawn = ctx.fastRespawnAt(spot))
+                {
+                    if (fastRespawn->entry == 0 || !ctx.questNeeds(fastRespawn->entry))
+                    {
+                        return false;
+                    }
                 }
 
                 if (!ctx.config.usePathfinding)
