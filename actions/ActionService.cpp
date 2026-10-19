@@ -311,11 +311,11 @@ ActionResult ActionService::execute(std::string_view action, std::string_view re
     // Where the client tells the cooldown, the bot's own count only bridges
     // the moment until it shows on the button (the cast, and the way there and
     // back): a press that did not go off no longer keeps the spell back for
-    // its whole cooldown.
+    // its whole cooldown. Synthetic throttle cooldowns (like CallPet) are kept.
     constexpr Duration kUntilShown{1500};
     Duration own = b->cooldown;
 
-    if (own > b->castTime + kUntilShown && clientTells(*b))
+    if (own > b->castTime + kUntilShown && clientTells(*b) && !b->name.ends_with(".CallPet"))
     {
         own = b->castTime + kUntilShown;
     }

@@ -110,6 +110,13 @@ void BuffTracker::update(const GameSnapshot& snapshot, BotContext& ctx)
         return;
     }
 
+    // Pet actions (Call Pet, Revive Pet) and summons are not aura buffs;
+    // do not hold them back for 30 minutes as "a stronger buff is up".
+    if (pressed.action.ends_with(".CallPet") || pressed.action.ends_with(".RevivePet") || pressed.action.starts_with("Pet.") || pressed.action.find("Summon") != std::string::npos)
+    {
+        return;
+    }
+
     ctx.actions.holdBack(pressed.action, kBlockedBuffHold);
     blockedBuffs_.push_back(BlockedBuff{pressed.action, pressed.before});
     ctx.log.info(logcat::Rest, "{} gave no buff - a stronger one is up, not casting it until a buff fades", pressed.action);
@@ -201,7 +208,7 @@ bool BuffTracker::applyInstantBuff(const GameSnapshot& snapshot, BotContext& ctx
         {
             const Duration wait = ctx.actions.castTime(*used) + kBuffLandWait;
 
-            if (ctx.actions.isReadyIgnoringGlobalCooldown(*used))
+            if (ctx.actions.cooldownRemaining(*used) < wait)
             {
                 ctx.actions.holdBack(*used, wait);
             }
@@ -231,7 +238,7 @@ bool BuffTracker::applyBuff(const GameSnapshot& snapshot, BotContext& ctx)
         {
             const Duration wait = ctx.actions.castTime(*used) + kBuffLandWait;
 
-            if (ctx.actions.isReadyIgnoringGlobalCooldown(*used))
+            if (ctx.actions.cooldownRemaining(*used) < wait)
             {
                 ctx.actions.holdBack(*used, wait);
             }

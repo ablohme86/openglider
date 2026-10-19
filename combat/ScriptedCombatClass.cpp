@@ -300,7 +300,7 @@ const script::Rule* ScriptedCombatClass::select(std::string_view blockName, Comb
                 }
                 else
                 {
-                    ctx.log.warn(logcat::Action, "{}: '{}' is not on an action bar", blockName, rule.action);
+                    ctx.log.warn(logcat::Action, "{}: '{}' is not on an action bar (ignoring until spell is learned)", blockName, rule.action);
                 }
             }
 
@@ -590,6 +590,27 @@ float ScriptedCombatClass::pullReach(CombatContext& ctx)
     }
 
     return reach > 0 ? reach : 5.0f;
+}
+
+bool ScriptedCombatClass::isRanged() const
+{
+    if (settings_.combatRange > 5.0f)
+    {
+        return true;
+    }
+
+    if (const auto* block = program_.block("pull"))
+    {
+        for (const auto& rule : block->rules)
+        {
+            if (!isAutoAttackAction(rule.action))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 float ScriptedCombatClass::combatRange(CombatContext& ctx)

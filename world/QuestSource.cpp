@@ -63,6 +63,11 @@ bool isMountVendor(std::string_view subName)
     return false;
 }
 
+bool isDemonTrainer(std::string_view subName)
+{
+    return subName.find("Demon Trainer") != std::string_view::npos || subName.find("Demon Master") != std::string_view::npos;
+}
+
 // A vendor of a holiday (Lunar Festival, Hallow's End) or of the Darkmoon
 // Faire: in the data all year, there only while it lasts.
 bool isEventVendor(std::string_view name, std::string_view subName)
@@ -81,6 +86,13 @@ bool isEventVendor(std::string_view name, std::string_view subName)
     }
 
     return false;
+}
+
+// Season of Discovery (SoD) additions (entry >= 200000: Rune Brokers, supply
+// officers, junior trainers) do not exist on Classic Era / Vanilla servers.
+bool isSodNpc(std::uint32_t entry)
+{
+    return entry >= 200000;
 }
 
 namespace
@@ -611,15 +623,18 @@ bool QuestSource::loadFromDb(const std::filesystem::path& dbPath, MapOfZone mapO
             const auto friendlyTo = npcStmt.columnString(5);
             const auto flags = npcStmt.columnInt(6);
 
-            if ((flags & 4) && !isMountVendor(subName) && !isEventVendor(name, subName))
+            if ((flags & 4) && !isMountVendor(subName) && !isEventVendor(name, subName) && !isSodNpc(entry) && !isDemonTrainer(subName))
             {
                 vendors_.emplace_back(entry, friendlyTo);
                 repairers_[entry] = (flags & 16384) != 0;
             }
 
-            if (const auto className = trainerClass(subName))
+            if (!isSodNpc(entry))
             {
-                classTrainers_.push_back({entry, *className, friendlyTo});
+                if (const auto className = trainerClass(subName))
+                {
+                    classTrainers_.push_back({entry, *className, friendlyTo});
+                }
             }
 
             if (!name.empty())
@@ -849,15 +864,18 @@ bool QuestSource::loadFromJson(std::string_view questsText, std::string_view npc
             const std::string vendorName = n.find("name") && n.find("name")->isString() ? n.find("name")->asString("") : std::string();
             const std::string vendorTitle = subName && subName->isString() ? subName->asString("") : std::string();
 
-            if ((flags & 4) && !isMountVendor(vendorTitle) && !isEventVendor(vendorName, vendorTitle))
+            if ((flags & 4) && !isMountVendor(vendorTitle) && !isEventVendor(vendorName, vendorTitle) && !isSodNpc(entry) && !isDemonTrainer(vendorTitle))
             {
                 vendors_.emplace_back(entry, n.find("friendlyTo") ? n.find("friendlyTo")->asString("") : "");
                 repairers_[entry] = (flags & 16384) != 0;
             }
 
-            if (const auto className = trainerClass(subName && subName->isString() ? subName->asString("") : std::string()))
+            if (!isSodNpc(entry))
             {
-                classTrainers_.push_back({entry, *className, n.find("friendlyTo") ? n.find("friendlyTo")->asString("") : ""});
+                if (const auto className = trainerClass(subName && subName->isString() ? subName->asString("") : std::string()))
+                {
+                    classTrainers_.push_back({entry, *className, n.find("friendlyTo") ? n.find("friendlyTo")->asString("") : ""});
+                }
             }
 
             const Json* name = n.find("name");

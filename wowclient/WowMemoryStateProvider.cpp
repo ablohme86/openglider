@@ -3001,6 +3001,15 @@ void WowMemoryStateProvider::autoDetectActionBindings(ActionMap& actionMap, bool
             }
         }
 
+        if (cleanName == "RevivePet")
+        {
+            ActionBinding petRevive = spell;
+            petRevive.name = "Pet.RevivePet";
+            bind(petRevive);
+            petRevive.name = "Pet.Revive";
+            bind(std::move(petRevive));
+        }
+
         bind(std::move(spell));
 
         if (isAttack)

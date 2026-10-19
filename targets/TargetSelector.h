@@ -50,6 +50,15 @@ struct TargetFilterConfig
     // not. Jasperlode Mine's kobolds sit 17-40 yd down at 20-30 yd out.
     float heightAllowance = 3.0f;
     float maxSlope = 0.5f; // rise per yard of level distance, about 27 degrees
+    bool ranged = false;
+    float rangedMaxHeightDifference = 35.0f;
+    float rangedMaxSlope = 1.0f; // rise per yard of level distance for ranged downhill (~45 degrees)
+    float rangedUphillMaxSlope = 1.5f; // rise per yard of level distance for ranged uphill (~56 degrees)
+
+    float effectiveMaxHeightDifference() const
+    {
+        return ranged ? std::max(maxHeightDifference, rangedMaxHeightDifference) : maxHeightDifference;
+    }
     float aggroRadiusBase = 20.0f; // BotConfig::aggroRadiusBase
     bool attackElites = false;
     // NPC entries known to be elite (rare elite, boss): the 64-bit clients do

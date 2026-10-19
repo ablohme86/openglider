@@ -139,6 +139,22 @@ std::vector<ProcessMemory::ProcessInfo> ProcessMemory::findProcesses(std::string
 namespace
 {
 
+void enableDebugPrivilege()
+{
+    HANDLE token = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token))
+    {
+        TOKEN_PRIVILEGES tp{};
+        if (LookupPrivilegeValue(nullptr, SE_DEBUG_NAME, &tp.Privileges[0].Luid))
+        {
+            tp.PrivilegeCount = 1;
+            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+            AdjustTokenPrivileges(token, FALSE, &tp, sizeof(tp), nullptr, nullptr);
+        }
+        CloseHandle(token);
+    }
+}
+
 // The first module of a process's module list is its .exe. The snapshot can
 // fail while the process is still loading its modules (ERROR_BAD_LENGTH):
 // tried again a few times.
@@ -210,19 +226,43 @@ std::uint64_t ProcessMemory::imageOfTheExe() const
 bool ProcessMemory::attach(int pid)
 {
     detach();
-    // PROCESS_QUERY_INFORMATION for the module list and the memory map; where
-    // it is not granted, the limited right still reads.
-    HANDLE h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    enableDebugPrivilege();
+
+    const DWORD processId = static_cast<DWORD>(pid);
+    HANDLE h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, processId);
 
     if (!h)
     {
-        h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
-    }
+        const DWORD firstError = GetLastError();
 
-    if (!h)
-    {
-        lastError_ = std::format("OpenProcess({}) failed: error {}", pid, GetLastError());
-        return false;
+        h = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+
+        if (!h)
+        {
+            const DWORD fallbackError = GetLastError();
+
+            // Try with only PROCESS_VM_READ
+            h = OpenProcess(PROCESS_VM_READ, FALSE, processId);
+
+            if (!h)
+            {
+                const DWORD vmReadError = GetLastError();
+
+                // Diagnose: kan vi hente grunnleggende prosessinformasjon?
+                HANDLE probe = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+                const DWORD queryError = probe ? ERROR_SUCCESS : GetLastError();
+
+                if (probe)
+                {
+                    CloseHandle(probe);
+                }
+
+                lastError_ = std::format(
+                    "OpenProcess({}): read+query={}, read+limited={}, read-only={}, limited-only={}",
+                    pid, firstError, fallbackError, vmReadError, queryError);
+                return false;
+            }
+        }
     }
 
     handle_ = h;

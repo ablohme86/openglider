@@ -131,6 +131,44 @@ bool BotContext::questNeeds(std::uint32_t entry) const
     return entry != 0 && config.quest.enabled && std::any_of(questTargets.begin(), questTargets.end(), [&](const QuestTarget& q) { return !q.done && std::find(q.mobs.begin(), q.mobs.end(), entry) != q.mobs.end(); });
 }
 
+bool BotContext::hasQuestLootNearby(const GameSnapshot& s, float maxDistance) const
+{
+    if (!lootEnabled() || !config.quest.enabled || s.isDead())
+    {
+        return false;
+    }
+
+    for (const auto& p : pendingLoot)
+    {
+        if (p.skinOnly)
+        {
+            continue;
+        }
+
+        const UnitState* u = s.findUnit(p.guid);
+
+        if (u && !u->isTappedByOther && (u->isLootable || config.lootWithoutFlag) && questNeeds(u->entry) && distance(s.player.position, u->position) <= maxDistance)
+        {
+            return true;
+        }
+    }
+
+    for (const auto& u : s.units)
+    {
+        if (u.isAlive() || u.isPlayer || u.isCritter || u.isTappedByOther || u.entry == 0 || !u.isLootable)
+        {
+            continue;
+        }
+
+        if (questNeeds(u.entry) && distance(s.player.position, u.position) <= maxDistance)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 const FastRespawn* BotContext::fastRespawnAt(const Vec3& at, std::uint32_t entry) const
 {
     for (const FastRespawn& f : fastRespawns)

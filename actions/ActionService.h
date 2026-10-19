@@ -72,6 +72,10 @@ public:
 
     bool isReady(std::string_view action) const override;
     bool isReadyIgnoringGlobalCooldown(std::string_view action) const override;
+    Duration cooldownRemaining(std::string_view action) const override
+    {
+        return cooldowns_.remaining(action, clock_.now());
+    }
     // The cooldown the client shows for an action bar slot, where it can be
     // read: an action's own cooldown is then the client's to tell, not a count
     // from the bot's key presses (which knows nothing of talents, of a spell
