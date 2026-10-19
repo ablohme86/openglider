@@ -360,11 +360,16 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
             return Status::Running;
         }
 
-        if (ctx.provider && ctx.provider->supportsLua())
+        if (buttons.empty() && ctx.provider && ctx.provider->supportsLua())
         {
             const auto c = continent(mapId_);
-            const float tx = c ? (c->left - plan_.toPosition.y) / (c->left - c->right) : 0.0f;
-            const float ty = c ? (c->top - plan_.toPosition.x) / (c->top - c->bottom) : 0.0f;
+            const float tx = c ? (c->left - plan_.toPosition.y) / (c->left - c->right) : -1.0f;
+            const float ty = c ? (c->top - plan_.toPosition.x) / (c->top - c->bottom) : -1.0f;
+            if (tx < 0.0f || tx > 1.0f || ty < 0.0f || ty > 1.0f)
+            {
+                return fail(ctx, "flight destination outside continent map bounds");
+            }
+
             const std::string script = std::format(
                 "local tx,ty={:.4f},{:.4f};"
                 "local cost={};"
@@ -374,10 +379,10 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
                 "if TaxiNodeGetType(i)=='REACHABLE' then "
                 "local x,y=TaxiNodePosition(i);"
                 "local d=(x-tx)*(x-tx)+(y-ty)*(y-ty);"
-                "if cost>0 and TaxiNodeCost(i)==cost then d=d*0.5 end;"
-                "if d<bestDist then bestDist=d;best=i end end end "
-                "if best and (bestDist<0.05*0.05 or (cost>0 and TaxiNodeCost(best)==cost)) then "
-                "TakeTaxiNode(best) end",
+                "if d<0.04*0.04 then "
+                "if d<bestDist-0.0005 then bestDist=d;best=i "
+                "elseif math.abs(d-bestDist)<=0.0005 and cost>0 and TaxiNodeCost(i)==cost then best=i end end end end "
+                "if best then TakeTaxiNode(best) end",
                 tx, ty, plan_.cost);
             ctx.runScript(script);
             ++clicks_;
