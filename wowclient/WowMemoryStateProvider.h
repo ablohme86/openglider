@@ -292,9 +292,11 @@ private:
     static void summarizeFishing(GameSnapshot& s, bool biteKnown);
     // The 64-bit client's action bars, with the keys its WTF bindings give them.
     std::vector<ActionBarSlot> readModernActionBars();
-    std::filesystem::path installDirectory() const;
 
 public:
+    // The folder the client is installed in (holding WTF): as configured, or
+    // where it runs from.
+    std::filesystem::path installDirectory() const;
     // The client's language, from its WTF/Config.wtf (textLocale): enUS where
     // it cannot be read.
     std::string gameLocale() const;

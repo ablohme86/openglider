@@ -70,7 +70,7 @@ const std::vector<std::string_view>& SnapshotEnvironment::globalFunctions()
 
 const std::vector<std::string_view>& SnapshotEnvironment::unitMembers()
 {
-    static const std::vector<std::string_view> v{"exists", "health", "hp", "maxHp", "power", "maxPower", "powerPercent", "mana", "level", "distance", "isElite", "isPlayer", "isCasting", "isDead", "isFleeing", "inCombat", "name", "targetingMe", "isLootable", "isSkinnable", "difficulty", "isAttacking", "hasAggro"};
+    static const std::vector<std::string_view> v{"exists", "health", "hp", "maxHp", "power", "maxPower", "powerPercent", "mana", "level", "distance", "isElite", "isPlayer", "isCasting", "isDead", "isFleeing", "inCombat", "name", "targetingMe", "onMyTarget", "isLootable", "isSkinnable", "difficulty", "isAttacking", "hasAggro"};
     return v;
 }
 
@@ -230,7 +230,7 @@ std::optional<Value> SnapshotEnvironment::unitMember(const UnitState* u, std::st
 
     if (!u)
     {
-        if (m == "isElite" || m == "isPlayer" || m == "isCasting" || m == "isDead" || m == "inCombat" || m == "targetingMe" || m == "isLootable" || m == "isSkinnable" || m == "isFleeing" || m == "isAttacking" || m == "hasAggro")
+        if (m == "isElite" || m == "isPlayer" || m == "isCasting" || m == "isDead" || m == "inCombat" || m == "targetingMe" || m == "onMyTarget" || m == "isLootable" || m == "isSkinnable" || m == "isFleeing" || m == "isAttacking" || m == "hasAggro")
         {
             return false;
         }
@@ -356,6 +356,13 @@ std::optional<Value> SnapshotEnvironment::unitMember(const UnitState* u, std::st
     if (m == "targetingMe")
     {
         return u->targetGuid != 0 && u->targetGuid == snapshot_.player.guid;
+    }
+
+    // On the character's own target: a pet left defending us went for the
+    // add that hit it, while the hunter shot the mob it pulled.
+    if (m == "onMyTarget")
+    {
+        return snapshot_.targetGuid != 0 && u->targetGuid == snapshot_.targetGuid;
     }
 
     if (m == "isLootable")

@@ -235,6 +235,11 @@ void QuestSource::useGameNames(const GameNames& names)
         use(quest.name, names.quest(id));
     }
 
+    // What an NPC offers, by the names its window shows them by: Sten
+    // Stoutarm's "Dwarven Outfitters" was looked for in a zhTW client's list
+    // of 矮人的交易.
+    givers_.rename([&](std::uint32_t id) { return names.quest(id); });
+
     for (auto& [id, name] : npcNames_)
     {
         use(name, names.npc(id));

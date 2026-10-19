@@ -64,18 +64,7 @@ bool clickAt(BotContext& ctx, const UiFrame& frame)
     return true;
 }
 
-// The flight master's gossip, where it has one: the line that shows the
-// flight map ("Show me where I can fly.").
-constexpr std::string_view kChooseFlight = "if C_GossipInfo and C_GossipInfo.GetOptions then "
-                                           "for i,v in ipairs(C_GossipInfo.GetOptions()) do "
-                                           "local t=string.lower(v.name or '') local k=string.lower(v.type or '') "
-                                           "if k=='taxi' or string.find(t,'fly') or string.find(t,'flight') then "
-                                           "if C_GossipInfo.SelectOptionByIndex then C_GossipInfo.SelectOptionByIndex(i) "
-                                           "else C_GossipInfo.SelectOption(v.gossipOptionID) end break end end "
-                                           "elseif GetGossipOptions then "
-                                           "local o={GetGossipOptions()} "
-                                           "for i=1,#o,2 do "
-                                           "if string.lower(o[i+1] or '')=='taxi' then SelectGossipOption(math.floor((i+1)/2)) break end end end";
+// The flight map closed again once the flight path is learnt.
 constexpr std::string_view kCloseMap = "if CloseTaxiMap then CloseTaxiMap() end; if C_GossipInfo and C_GossipInfo.CloseGossip then C_GossipInfo.CloseGossip() elseif CloseGossip then CloseGossip() end";
 } // namespace
 
@@ -262,19 +251,19 @@ BehaviorStatus FlightMasterBehavior::tick(const GameSnapshot& s, BotContext& ctx
     const bool lua = ctx.provider && ctx.provider->supportsLua();
 
     // A gossip first, where it has one: the flight line chosen once.
-    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_)
+    if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
         if (lua)
         {
-            ctx.runScript(kChooseFlight);
+            ctx.runScript(kChooseFlightLua);
             gossipChosen_ = true;
             talkedAt_ = now;
             return BehaviorStatus::Running;
         }
 
-        if (ctx.provider)
+        if (const auto choice = flightGossipChoice(*ctx.provider))
         {
-            if (const auto known = flightGossipLines(*ctx.provider); known.size() == 1 && clickAt(ctx, known.front()))
+            if (clickAt(ctx, *choice))
             {
                 gossipChosen_ = true;
                 talkedAt_ = now;

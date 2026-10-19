@@ -900,6 +900,14 @@ BehaviorStatus QuestHandInBehavior::accept(const GameSnapshot& s, BotContext& ct
             ctx.log.info(logcat::Profile, "quest mode: {}", why);
         }
 
+        // Still in the log: its row was not found in the NPC's list (the title
+        // in another language than the quest data's). Taken for handed in, it
+        // was talked to again at once, the window opened and shut every 6 s.
+        if (!pickingUp_ && !handedIn_ && inLog(s, quest_->questId))
+        {
+            return leave(ctx, std::format("{} was not among {}'s quests", quest_->questName, quest_->handInTo), true);
+        }
+
         return leave(ctx, pickingUp_ ? "visited" : "handed in", false);
     };
 

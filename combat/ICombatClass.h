@@ -92,6 +92,11 @@ inline std::optional<ScriptMove::Way> scriptMoveWay(std::string_view action)
 // The most a script may ask to be walked in one step.
 inline constexpr float kScriptMoveLongest = 40.0f;
 
+// What the two bodies add to a minimum range, middle to middle: the server
+// measures it from the one's edge to the other's - each combat reach, some
+// 1.5 yd for a player or a humanoid mob. Auto Shot's 8 yd is about 11.
+inline constexpr float kBodiesReach = 3.0f;
+
 struct CombatContext
 {
     const GameSnapshot& snapshot;
@@ -173,6 +178,15 @@ public:
     virtual bool onPull(CombatContext& ctx) = 0;
     virtual void resetPull()
     {
+    }
+
+    // True when a combat rule would fire right now - asked with the mob moved,
+    // to find where the rotation reaches when it fires nowhere (a hunter at 6
+    // yards: Raptor Strike reaches 5, Auto Shot starts at 8).
+    virtual bool wantsCombat(CombatContext& ctx)
+    {
+        (void)ctx;
+        return false;
     }
 
     virtual bool onCombat(CombatContext& ctx) = 0;

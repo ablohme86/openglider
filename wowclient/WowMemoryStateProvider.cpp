@@ -46,6 +46,16 @@
 #include <unordered_map>
 #include <utility>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace og::wowclient
 {
 
@@ -1562,18 +1572,19 @@ void WowMemoryStateProvider::ensureSpellErrorHook()
     // "N R M": not-ready refusals, out-of-range / line-of-sight ones, and moving refusals.
     // Earlier versions only counted N or N R; upgrade if an existing session carries it.
     if (executeLua("if _OG_SE and not _OG_SE2 then _OG_SE:UnregisterAllEvents() end "
-                   "if not _OG_SE2 or not _OG_SE2_M then "
+                   "if not _OG_SE2 or _OG_SE2_V~=2 then "
                    "if not _OG_SE2 then _OG_SE2=CreateFrame('Frame') end "
                    "_OG_SE2_N=_OG_SE2_N or 0 "
                    "_OG_SE2_R=_OG_SE2_R or 0 "
-                   "_OG_SE2_M=0 "
-                   "RegisterCVar('og_spell_errors2', '0 0 0') "
+                   "_OG_SE2_M=_OG_SE2_M or 0 "
+                   "_OG_SE2_V=2 "
+                   "RegisterCVar('og_spell_errors2', _OG_SE2_N..' '.._OG_SE2_R..' '.._OG_SE2_M) "
                    "_OG_SE2:RegisterEvent('UI_ERROR_MESSAGE') "
                    "_OG_SE2:SetScript('OnEvent', function(self, event, a1, a2) "
                    "local msg = type(a1)=='string' and a1 or (type(a2)=='string' and a2 or '') "
                    "if msg==ERR_SPELL_COOLDOWN or msg==ERR_ABILITY_COOLDOWN or msg==SPELL_FAILED_NOT_READY then "
                    "_OG_SE2_N=_OG_SE2_N+1 "
-                   "elseif msg==ERR_OUT_OF_RANGE or msg==SPELL_FAILED_OUT_OF_RANGE or msg==SPELL_FAILED_LINE_OF_SIGHT then "
+                   "elseif msg==ERR_OUT_OF_RANGE or msg==SPELL_FAILED_OUT_OF_RANGE or msg==SPELL_FAILED_LINE_OF_SIGHT or msg==SPELL_FAILED_TOO_CLOSE then "
                    "_OG_SE2_R=_OG_SE2_R+1 "
                    "elseif msg==ERR_SPELL_FAILED_MOVING or msg==SPELL_FAILED_MOVING or msg==[[Can't do that while moving]] then "
                    "_OG_SE2_M=_OG_SE2_M+1 "
@@ -2001,7 +2012,23 @@ std::filesystem::path WowMemoryStateProvider::installDirectory() const
     {
         return config_.installDirectory;
     }
-#ifndef _WIN32
+#ifdef _WIN32
+    // The folder of the client's executable.
+    if (HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(memory_->pid())))
+    {
+        wchar_t image[MAX_PATH * 4]{};
+        DWORD size = static_cast<DWORD>(std::size(image));
+        std::filesystem::path folder;
+
+        if (QueryFullProcessImageNameW(process, 0, image, &size))
+        {
+            folder = std::filesystem::path(std::wstring(image, size)).parent_path();
+        }
+
+        CloseHandle(process);
+        return folder;
+    }
+#else
     // Clients run from their install directory, under wine too.
     std::error_code ec;
     auto cwd = std::filesystem::read_symlink(std::format("/proc/{}/cwd", memory_->pid()), ec);

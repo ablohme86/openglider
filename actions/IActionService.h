@@ -117,8 +117,8 @@ public:
     // and the global cooldown count as ready again, so the rotation keeps
     // pressing it instead of waiting out a cooldown that never started.
     virtual void spellNotReady() = 0;
-    // The client answered the last spell press with "Out of range" or "Target
-    // not in line of sight". Nothing started - no cast, no GCD - but pressing it
+    // The client answered the last spell press with "Out of range", "Target
+    // too close" or "Target not in line of sight". Nothing started - no cast, no GCD - but pressing it
     // again from here would fail the same way, so the spell is held back
     // briefly: the rotation moves on and the pull approach closes in.
     virtual void spellOutOfReach() = 0;

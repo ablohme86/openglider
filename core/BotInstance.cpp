@@ -303,6 +303,26 @@ void BotInstance::setCombatClass(std::unique_ptr<ICombatClass> combatClass)
 
 void BotInstance::tick()
 {
+    // Stopped while a route is worked out: the client's map gives it up with
+    // an exception (ClientNavigationProvider), which ends the tick - not the
+    // program. Stopping the command line on a vendor trip crashed it.
+    try
+    {
+        tickOnce();
+    }
+    catch (const std::runtime_error& e)
+    {
+        const std::string_view what = e.what();
+
+        if (!obstacles_.stopToken().stop_requested() || (what != "route calculation cancelled" && what != "map loading cancelled"))
+        {
+            throw;
+        }
+    }
+}
+
+void BotInstance::tickOnce()
+{
     if (finished_)
     {
         return;
@@ -678,6 +698,9 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
         {
             dangerZones.push_back({f.at, FastRespawn::kRadius, f.name, false, true});
             context_.packZones.push_back({f.at, FastRespawn::kRadius, f.name + " (respawns at once)", false, AvoidZone::reachOf(FastRespawn::kRadius)});
+            std::erase_if(context_.pendingLoot, [&](const PendingLoot& p) {
+                return !p.inProgress && distance2D(p.position, f.at) <= FastRespawn::kRadius;
+            });
         }
     }
 

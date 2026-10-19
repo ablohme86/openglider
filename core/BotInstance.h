@@ -421,6 +421,8 @@ public:
     }
 
 private:
+    // One tick of tick(), which ends it where a stop cancels a route.
+    void tickOnce();
     void updateStatus();
     void checkStopAtLevel();
     // Under water, and the breath left (BotContext::breath).

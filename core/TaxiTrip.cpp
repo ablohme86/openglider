@@ -42,7 +42,7 @@ std::optional<Continent> continent(std::uint32_t mapId)
     switch (mapId)
     {
     case 0:
-        return Continent{18171.97f, -22569.21f, 11176.34f, -15973.34f};
+        return Continent{4910.0f, -7150.0f, 5840.0f, -17240.0f};
     case 1:
         return Continent{17066.6f, -19733.2f, 12799.9f, -11733.3f};
     default:
@@ -110,12 +110,57 @@ std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider)
     return found;
 }
 
-std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known)
+std::optional<UiFrame> flightGossipChoice(IGameStateProvider& provider)
+{
+    std::vector<UiFrame> gossipButtons;
+    for (int i = 1; i <= 16; ++i)
+    {
+        if (const auto btn = provider.uiFrame(std::format("GossipTitleButton{}", i)); btn && btn->visible)
+        {
+            gossipButtons.push_back(*btn);
+        }
+    }
+
+    auto known = flightGossipLines(provider);
+
+    if (!gossipButtons.empty())
+    {
+        std::erase_if(known, [&](const UiFrame& line) {
+            return std::none_of(gossipButtons.begin(), gossipButtons.end(), [&](const UiFrame& btn) {
+                return std::abs(line.centerY() - btn.centerY()) < 0.02f || (line.top >= btn.top - 0.01f && line.bottom <= btn.bottom + 0.01f);
+            });
+        });
+    }
+
+    if (known.size() == 1)
+    {
+        return known.front();
+    }
+
+    if (known.size() == 2)
+    {
+        const auto topMost = std::min_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+        const auto bottomMost = std::max_element(known.begin(), known.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+        if (bottomMost->top > topMost->bottom)
+        {
+            return *bottomMost;
+        }
+    }
+
+    if (gossipButtons.size() == 1)
+    {
+        return gossipButtons.front();
+    }
+
+    return std::nullopt;
+}
+
+std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known, std::optional<std::uint32_t> from)
 {
     const auto c = continent(mapId);
     const float width = map.right - map.left, height = map.bottom - map.top;
 
-    if (!c || width <= 0 || height <= 0 || buttons.empty())
+    if (!c || width <= 0 || height <= 0 || buttons.empty() || (from && target == *from))
     {
         return std::nullopt;
     }
@@ -131,21 +176,53 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
         return std::nullopt;
     }
 
+    // The origin flight master's button cannot be the destination.
+    std::optional<int> fromButton;
+    if (from)
+    {
+        if (const auto* current = network.node(*from); current && current->mapId == mapId)
+        {
+            const auto it = std::min_element(buttons.begin(), buttons.end(), [&](const auto& a, const auto& b) {
+                return apart(onMap(a.second), placed(*current)) < apart(onMap(b.second), placed(*current));
+            });
+            if (it != buttons.end() && apart(onMap(it->second), placed(*current)) < 0.08f)
+            {
+                fromButton = it->first;
+            }
+        }
+    }
+
+    std::vector<std::pair<int, UiFrame>> candidates;
+    for (const auto& b : buttons)
+    {
+        if (!fromButton || b.first != *fromButton)
+        {
+            candidates.push_back(b);
+        }
+    }
+
+    if (candidates.empty())
+    {
+        return std::nullopt;
+    }
+
     // The button nearest where the flight point is...
-    const auto nearest = std::min_element(buttons.begin(), buttons.end(), [&](const auto& a, const auto& b) { return apart(onMap(a.second), placed(*wanted)) < apart(onMap(b.second), placed(*wanted)); });
+    const auto nearest = std::min_element(candidates.begin(), candidates.end(), [&](const auto& a, const auto& b) {
+        return apart(onMap(a.second), placed(*wanted)) < apart(onMap(b.second), placed(*wanted));
+    });
 
     // ...is it, if no other flight point learnt is nearer that button.
     for (const auto id : known)
     {
         const auto* other = network.node(id);
 
-        if (other && other->mapId == mapId && id != target && apart(onMap(nearest->second), placed(*other)) < apart(onMap(nearest->second), placed(*wanted)))
+        if (other && other->mapId == mapId && id != target && (!from || id != *from) && apart(onMap(nearest->second), placed(*other)) < apart(onMap(nearest->second), placed(*wanted)))
         {
             return std::nullopt;
         }
     }
 
-    return apart(onMap(nearest->second), placed(*wanted)) < 0.05f ? std::optional<int>{nearest->first} : std::nullopt;
+    return apart(onMap(nearest->second), placed(*wanted)) < 0.08f ? std::optional<int>{nearest->first} : std::nullopt;
 }
 
 TaxiTrip::Status TaxiTrip::fail(BotContext& ctx, std::string why)
@@ -258,32 +335,71 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
         }
 
         const auto known = s.player.knownTaxiNodes.value_or(std::vector<std::uint32_t>{});
-        const auto button = map && ctx.network() ? taxiButtonFor(plan_.to, mapId_, buttons, *map, *ctx.network(), known) : std::nullopt;
+        const auto button = map && ctx.network() ? taxiButtonFor(plan_.to, mapId_, buttons, *map, *ctx.network(), known, plan_.from) : std::nullopt;
 
-        if (!button)
+        if (button)
         {
-            // Looked for again a while, the map still settling.
-            if (now - mapSeenAt_ < kMapLooked)
+            if (ctx.provider && ctx.provider->supportsLua())
             {
-                return Status::Running;
+                ctx.runScript(std::format("TakeTaxiNode({})", *button));
+            }
+            else
+            {
+                const auto frame = std::find_if(buttons.begin(), buttons.end(), [&](const auto& b) { return b.first == *button; })->second;
+                if (!clickAt(ctx, frame))
+                {
+                    return Status::Running;
+                }
             }
 
-            return fail(ctx, std::format("flight point {} not found on the flight map ({} shown)", plan_.to, buttons.size()));
+            ++clicks_;
+            clickedAt_ = now;
+            stage_ = Stage::Flying;
+            lastPosition_ = pos;
+            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} (button TaxiButton{})", plan_.from, plan_.to, *button);
+            return Status::Running;
         }
 
-        const auto frame = std::find_if(buttons.begin(), buttons.end(), [&](const auto& b) { return b.first == *button; })->second;
+        if (buttons.empty() && ctx.provider && ctx.provider->supportsLua())
+        {
+            const auto c = continent(mapId_);
+            const float tx = c ? (c->left - plan_.toPosition.y) / (c->left - c->right) : -1.0f;
+            const float ty = c ? (c->top - plan_.toPosition.x) / (c->top - c->bottom) : -1.0f;
+            if (tx < 0.0f || tx > 1.0f || ty < 0.0f || ty > 1.0f)
+            {
+                return fail(ctx, "flight destination outside continent map bounds");
+            }
 
-        if (!clickAt(ctx, frame))
+            const std::string script = std::format(
+                "local tx,ty={:.4f},{:.4f};"
+                "local cost={};"
+                "local num=NumTaxiNodes();"
+                "local best,bestDist=nil,999999;"
+                "for i=1,num do "
+                "if TaxiNodeGetType(i)=='REACHABLE' then "
+                "local x,y=TaxiNodePosition(i);"
+                "local d=(x-tx)*(x-tx)+(y-ty)*(y-ty);"
+                "if d<0.04*0.04 then "
+                "if d<bestDist-0.0005 then bestDist=d;best=i "
+                "elseif math.abs(d-bestDist)<=0.0005 and cost>0 and TaxiNodeCost(i)==cost then best=i end end end end "
+                "if best then TakeTaxiNode(best) end",
+                tx, ty, plan_.cost);
+            ctx.runScript(script);
+            ++clicks_;
+            clickedAt_ = now;
+            stage_ = Stage::Flying;
+            lastPosition_ = pos;
+            ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
+            return Status::Running;
+        }
+
+        // Looked for again a while, the map still settling.
+        if (now - mapSeenAt_ < kMapLooked)
         {
             return Status::Running;
         }
 
-        ++clicks_;
-        clickedAt_ = now;
-        stage_ = Stage::Flying;
-        lastPosition_ = pos;
-        ctx.log.info(logcat::Move, "flight: flying from flight point {} to {} ({} copper)", plan_.from, plan_.to, plan_.cost);
-        return Status::Running;
+        return fail(ctx, std::format("flight point {} not found on the flight map ({} shown)", plan_.to, buttons.size()));
     }
 
     // The flight map shut: looked at anew when it opens again.
@@ -342,18 +458,22 @@ TaxiTrip::Status TaxiTrip::tick(const GameSnapshot& s, BotContext& ctx)
     // A gossip first, where it has one: the line to fly by.
     if (ctx.uiFrameVisible("GossipFrame") && !gossipChosen_ && ctx.provider)
     {
-        const auto known = flightGossipLines(*ctx.provider);
-
-        if (known.size() == 1 && clickAt(ctx, known.front()))
+        if (ctx.provider->supportsLua())
         {
+            ctx.runScript(kChooseFlightLua);
             gossipChosen_ = true;
             talkedAt_ = now;
             return Status::Running;
         }
 
-        if (known.size() > 1)
+        if (const auto choice = flightGossipChoice(*ctx.provider))
         {
-            ctx.log.info(logcat::Move, "flight: {} of the flight master's gossip lines have a word to fly by", known.size());
+            if (clickAt(ctx, *choice))
+            {
+                gossipChosen_ = true;
+                talkedAt_ = now;
+                return Status::Running;
+            }
         }
 
         // None of those words, or more than one line with one: a flight

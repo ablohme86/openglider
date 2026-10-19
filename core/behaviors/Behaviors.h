@@ -20,6 +20,7 @@
 
 #include "og/core/Humanizer.h"
 #include "og/core/IBotBehavior.h"
+#include "og/core/TaxiTrip.h"
 #include "og/state/IGameStateProvider.h"
 
 #include <memory>
@@ -494,6 +495,13 @@ private:
     bool takeScriptMove(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
     void stopScriptMove(BotContext& ctx);
     std::optional<ScriptMove> scriptMove_;
+    // Between melee reach and a minimum range (a hunter at 5-8 yards), where
+    // nothing in the rotation fires: stepped out of (leaveDeadZone).
+    void leaveDeadZone(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, float dist);
+    Guid deadZoneOf_ = 0;
+    TimePoint deadZoneAt_{};
+    std::optional<float> deadZoneIn_; // walking in to this distance
+    std::optional<Vec3> deadZoneBackFrom_; // where the last step back started
     Vec3 scriptMoveFrom_;
     TimePoint scriptMoveSince_{};
     Vec3 scriptMoveProgressAt_;
@@ -1083,7 +1091,8 @@ private:
         Travelling,
         Opening,
         Gossip,
-        Training
+        Training,
+        Returning
     };
 
     BehaviorStatus finish(BotContext& ctx, const std::string& reason, bool failed);
@@ -1101,6 +1110,10 @@ private:
     Guid npc_ = 0;
     TimePoint started_{}, stageStarted_{}, stepAt_{};
     std::optional<Vec3> progressFrom_;
+    std::optional<Vec3> tripFrom_;
+    std::optional<TaxiTrip> taxiTrip_;
+    bool taxiChecked_ = false;
+    std::size_t taxiKnown_ = 0;
     int opens_ = 0;
     int rightClicks_ = 0;
     bool mouseTried_ = false;
@@ -1288,6 +1301,9 @@ private:
     };
     UiStep uiStep_ = UiStep::Open;
     TimePoint uiStepAt_{};
+    // The StaticPopups open before Sell All Junk was clicked (bit i-1 for
+    // StaticPopup<i>): its confirmation is the one that was not.
+    unsigned popupsBeforeJunk_ = 0;
     TimePoint uiHoverStarted_{};
     std::set<std::uint64_t> visitedBagButtons_;
     // Slots looked at that still hold something (kept, or a sale that did not

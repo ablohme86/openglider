@@ -36,7 +36,7 @@ class BotContext;
 // TaxiButtonN frames shown (N, where), `map` the map's frame; the flight
 // points learnt on `mapId` are placed on the continent's map and matched to
 // the nearest. nullopt where `target`'s button is not the one nearest it.
-std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known);
+std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, const std::vector<std::pair<int, UiFrame>>& buttons, const UiFrame& map, const TaxiNetwork& network, const std::vector<std::uint32_t>& known, std::optional<std::uint32_t> from = std::nullopt);
 
 // The lines to fly by in a flight master's gossip - "Show me where I can
 // fly.", Omusa Thunderhorn's "I need a ride.", in the game's other languages
@@ -45,6 +45,22 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
 // one). Only one of them is the line to click: with more, a quest's title with
 // "ride" in it may be one of them.
 std::vector<UiFrame> flightGossipLines(IGameStateProvider& provider);
+
+// A Lua script that selects the taxi/flight option in GossipFrame across WoW versions.
+inline constexpr std::string_view kChooseFlightLua =
+    "if C_GossipInfo and C_GossipInfo.GetOptions then "
+    "for i,v in ipairs(C_GossipInfo.GetOptions()) do "
+    "local t=string.lower(v.name or '') local k=string.lower(v.type or '') "
+    "if k=='taxi' or string.find(t,'fly') or string.find(t,'flight') then "
+    "if C_GossipInfo.SelectOptionByIndex then C_GossipInfo.SelectOptionByIndex(i) "
+    "else C_GossipInfo.SelectOption(v.gossipOptionID) end break end end "
+    "elseif GetGossipOptions then "
+    "local o={GetGossipOptions()} "
+    "for i=1,#o,2 do "
+    "if string.lower(o[i+1] or '')=='taxi' then SelectGossipOption(math.floor((i+1)/2)) break end end end";
+
+// Locates the UI frame of the flight gossip option to click, if uniquely identifiable.
+std::optional<UiFrame> flightGossipChoice(IGameStateProvider& provider);
 
 class TaxiTrip
 {

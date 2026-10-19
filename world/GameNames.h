@@ -23,6 +23,8 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace og
 {
@@ -34,6 +36,13 @@ public:
     // False where the database has none for it: enUS, the quest data's own,
     // needs none.
     bool load(const std::filesystem::path& worldDb, const std::string& locale, std::string* error = nullptr);
+
+    // The language of the names a client shows, where its Config.wtf does
+    // not say (no textLocale there: a client installed in its language and
+    // never switched). Each NPC seen (id, name as the client has it) is looked
+    // up in world.db; the language most of them are in, "enUS" for the quest
+    // data's own. nullopt with fewer than `fewest` known.
+    static std::optional<std::string> localeOfNpcNames(const std::filesystem::path& worldDb, const std::vector<std::pair<std::uint32_t, std::string>>& seen, int fewest = 3, std::string* error = nullptr);
 
     const std::string& locale() const
     {
