@@ -100,7 +100,7 @@ const UnitState* TargetSelector::threatInTheWay(const GameSnapshot& s, std::opti
             continue;
         }
 
-        if (std::fabs(u.position.z - at.z) > config_.maxHeightDifference)
+        if (std::fabs(u.position.z - at.z) > config_.effectiveMaxHeightDifference())
         {
             continue;
         }
@@ -218,7 +218,7 @@ const UnitState* TargetSelector::standingInTheWay(const GameSnapshot& s, const U
             continue;
         }
 
-        if (std::fabs(u.position.z - at.z) > config_.maxHeightDifference || (avoidedPosition_ && avoidedPosition_(u.position)))
+        if (std::fabs(u.position.z - at.z) > config_.effectiveMaxHeightDifference() || tooSteep(u, s) || (avoidedPosition_ && avoidedPosition_(u.position)))
         {
             continue;
         }
@@ -371,7 +371,7 @@ std::optional<std::string> TargetSelector::rejectReason(const UnitState& u, cons
 
     const float rise = std::fabs(u.position.z - s.player.position.z);
 
-    if (rise > config_.maxHeightDifference)
+    if (rise > config_.effectiveMaxHeightDifference())
     {
         return "height difference";
     }
@@ -393,6 +393,12 @@ std::optional<std::string> TargetSelector::rejectReason(const UnitState& u, cons
 bool TargetSelector::tooSteep(const UnitState& u, const GameSnapshot& s) const
 {
     const float rise = std::fabs(u.position.z - s.player.position.z);
+    if (config_.ranged)
+    {
+        const bool uphill = u.position.z >= s.player.position.z;
+        const float slope = uphill ? config_.rangedUphillMaxSlope : config_.rangedMaxSlope;
+        return rise > config_.heightAllowance + distance2D(s.player.position, u.position) * slope;
+    }
     return rise > config_.heightAllowance + distance2D(s.player.position, u.position) * config_.maxSlope;
 }
 

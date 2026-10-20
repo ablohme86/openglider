@@ -212,6 +212,8 @@ struct BotContext
     std::vector<FastRespawn> fastRespawns;
     // An unfinished quest objective has the character kill or loot this mob.
     bool questNeeds(std::uint32_t entry) const;
+    // True if there is a quest corpse nearby that needs looting for a quest item.
+    bool hasQuestLootNearby(const GameSnapshot& s, float maxDistance = 30.0f) const;
     // The fast respawn place `at` lies in, for that mob (0: any); nullptr when none.
     const FastRespawn* fastRespawnAt(const Vec3& at, std::uint32_t entry = 0) const;
     // standUp(): when the character was first asked to stand, and when last.

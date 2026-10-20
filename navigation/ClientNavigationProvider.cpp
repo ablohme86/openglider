@@ -235,7 +235,7 @@ unsigned char kindOf(unsigned char area)
 constexpr float kHillSlope = 20;
 constexpr unsigned char kHillArea = 4; // area id while building; 4 in the mesh
 constexpr float kHillCost = 2.5f;
-constexpr float kRoadNearGoal = 50;
+constexpr float kRoadNearGoal = 150;
 // Roads (the ground's road textures) cost kRoadCost of open ground from as
 // far off: a long way keeps to them as a player does - the road from
 // Goldshire to Northshire, not across the fields - as long as the road is

@@ -204,6 +204,13 @@ bool CombatBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
 
     if (!s.attackers().empty())
     {
+        // When a quest mob was killed and needs looting for a quest item,
+        // yield to LootBehavior first even if adds/attackers are hitting us.
+        if (ctx.hasQuestLootNearby(s))
+        {
+            return false;
+        }
+
         return true; // always defend
     }
 
@@ -414,7 +421,7 @@ BehaviorStatus CombatBehavior::tick(const GameSnapshot& s, BotContext& ctx)
     // ground, in a mine below or on another floor. Arrival is judged on the
     // level, so the bot would stand on top of it until the approach timed out.
     // Something attacking us is fought wherever it is.
-    if (!s.isAttacker(*unit) && ctx.targets.tooSteep(*unit, s))
+    if (!pullActionExecuted_ && !s.isAttacker(*unit) && ctx.targets.tooSteep(*unit, s))
     {
         ctx.navigator.stop();
         ctx.blacklistTarget(unit->guid, unit->name, "under the ground");
@@ -510,6 +517,17 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
     if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t) && !t->isFleeing && unit.guid != fled_)
     {
         ctx.combat.engaged = t->guid;
+        return BehaviorStatus::Running;
+    }
+
+    // If the client has a stray live target that is not attacking us (e.g. auto-targeted
+    // after a kill or from an earlier tab), clear it first. Leaving it targeted makes
+    // Target.Next (Tab) cycle distant mobs in front of the camera instead of targeting
+    // the nearest attacker hitting us.
+    if (const UnitState* t = s.target(); t && t->isAlive() && !s.isAttacker(*t) && t->guid != unit.guid)
+    {
+        ctx.log.info(logcat::Target, "clearing stray target {} {} before acquiring attacker {}", t->name, formatGuid(t->guid), unit.name);
+        ctx.actions.execute(actions::TargetClear);
         return BehaviorStatus::Running;
     }
 

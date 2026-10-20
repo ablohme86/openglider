@@ -52,7 +52,7 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
     constexpr Duration kStrayAttackWait{2000};
     constexpr Duration kStrayClearEvery{3000};
     const UnitState* target = s.target();
-    const bool stray = s.inCombat() && attackers.empty() && target && target->guid != ctx.combat.engaged && (!target->isAlive() || target->targetGuid != s.player.guid);
+    const bool stray = (s.inCombat() || s.player.isAutoAttacking) && attackers.empty() && target && target->guid != ctx.combat.engaged && (!target->isAlive() || !s.isAttacker(*target));
 
     if (!stray)
     {
@@ -65,7 +65,7 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
     else if (now - *strayAttackSince_ >= kStrayAttackWait && now - strayClearedAt_ >= kStrayClearEvery)
     {
         strayClearedAt_ = now;
-        ctx.log.info(logcat::Combat, "in combat with nothing fighting us, auto-attacking {} - clearing the target to stop it", target->name);
+        ctx.log.info(logcat::Combat, "nothing fighting us, auto-attacking or targeting {} - clearing the target to stop it", target->name);
         ctx.actions.execute(actions::TargetClear);
     }
 
@@ -98,15 +98,22 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
 
         if (!u->isAlive())
         {
-            if (ctx.config.quest.enabled && std::any_of(ctx.questTargets.begin(), ctx.questTargets.end(), [&](const QuestTarget& q) { return !q.done && std::find(q.mobs.begin(), q.mobs.end(), u->entry) != q.mobs.end(); }))
+            if (!u->isTappedByOther)
             {
-                ctx.questPullAfter = now + Duration(1000);
-            }
+                if (ctx.config.quest.enabled && std::any_of(ctx.questTargets.begin(), ctx.questTargets.end(), [&](const QuestTarget& q) { return !q.done && std::find(q.mobs.begin(), q.mobs.end(), u->entry) != q.mobs.end(); }))
+                {
+                    ctx.questPullAfter = now + Duration(1000);
+                }
 
-            ++ctx.stats.kills;
-            ctx.log.info(logcat::Combat, "{} {} killed", u->name, formatGuid(u->guid));
-            ctx.recentKills.push_back({u->guid, u->entry, u->name, u->position, now});
-            ctx.events.publish(TargetKilledEvent{u->guid, u->name, u->position});
+                ++ctx.stats.kills;
+                ctx.log.info(logcat::Combat, "{} {} killed", u->name, formatGuid(u->guid));
+                ctx.recentKills.push_back({u->guid, u->entry, u->name, u->position, now});
+                ctx.events.publish(TargetKilledEvent{u->guid, u->name, u->position});
+            }
+            else
+            {
+                ctx.log.info(logcat::Combat, "{} {} died (tagged by another player)", u->name, formatGuid(u->guid));
+            }
 
             if (ctx.lootEnabled() || ctx.skinEnabled())
             {
@@ -114,7 +121,7 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
 
                 if (!known)
                 {
-                    ctx.pendingLoot.push_back({u->guid, u->position, now, false, now});
+                    ctx.pendingLoot.push_back({u->guid, u->position, now, false, now, u->isTappedByOther});
                 }
             }
 

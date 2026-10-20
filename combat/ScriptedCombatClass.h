@@ -69,6 +69,7 @@ public:
 
     float combatRange(CombatContext& ctx) override;
     float pullReach(CombatContext& ctx) override;
+    bool isRanged() const override;
     bool wantsMeleeSwing(CombatContext& ctx) override;
 
     std::vector<std::string> blockActions(std::string_view block) const override;
@@ -196,6 +197,7 @@ private:
     std::set<std::string> reportedUnbound_;
     std::optional<TimePoint> wandStopPressedAt_;
     std::set<std::size_t> pullExecutedRules_;
+    std::map<std::string, float, std::less<>> actionMaxRanges_;
 };
 
 } // namespace og

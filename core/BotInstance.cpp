@@ -259,12 +259,7 @@ void BotInstance::setProfileOptions(GliderProfile::Options options)
 
 void BotInstance::refreshTargetFilter()
 {
-    if (!profile_)
-    {
-        return;
-    }
-
-    TargetFilterConfig filter = filterFromProfile(*profile_);
+    TargetFilterConfig filter = profile_ ? filterFromProfile(*profile_) : targets_.config();
     filter.blacklistDuration = config_.blacklistDuration;
     filter.skipGrayMobs = config_.skipGrayMobs;
     filter.aggroRadiusBase = config_.aggroRadiusBase;
@@ -276,6 +271,7 @@ void BotInstance::refreshTargetFilter()
     filter.addRadius = config_.packRadius;
     filter.protectRange = config_.protectRange;
     filter.protectAngle = config_.protectAngle;
+    filter.ranged = combatClass_ && combatClass_->isRanged();
     targets_.setConfig(std::move(filter));
 }
 
@@ -299,6 +295,8 @@ void BotInstance::setCombatClass(std::unique_ptr<ICombatClass> combatClass)
     {
         log_.info(logcat::Profile, "combat class '{}'", combatClass_->name());
     }
+
+    refreshTargetFilter();
 }
 
 void BotInstance::tick()

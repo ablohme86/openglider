@@ -92,7 +92,12 @@ bool worthLooting(const PendingLoot& p, const GameSnapshot& s, const BotContext&
 
     // A quest's mob back at once by its corpse guards it for ever: what the
     // quest needs is taken all the same (as in tick).
-    if (!u || (ctx.corpseGuarded(s, u->position) && !(ctx.questNeeds(u->entry) && ctx.fastRespawnAt(u->position, u->entry))))
+    if (!u || (ctx.corpseGuarded(s, u->position) && !ctx.questNeeds(u->entry)))
+    {
+        return false;
+    }
+
+    if (!s.attackers().empty() && !ctx.questNeeds(u->entry))
     {
         return false;
     }
@@ -125,7 +130,12 @@ bool worthLooting(const PendingLoot& p, const GameSnapshot& s, const BotContext&
 
 bool LootBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
 {
-    if (!(ctx.lootEnabled() || ctx.skinEnabled()) || s.isDead() || !s.attackers().empty())
+    if (!(ctx.lootEnabled() || ctx.skinEnabled()) || s.isDead())
+    {
+        return false;
+    }
+
+    if (!s.attackers().empty() && !ctx.hasQuestLootNearby(s))
     {
         return false;
     }
@@ -193,9 +203,14 @@ void LootBehavior::discoverNearby(const GameSnapshot& s, BotContext& ctx)
     }
 }
 
-void LootBehavior::onEnter(const GameSnapshot&, BotContext&)
+void LootBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
 {
     current_ = 0;
+
+    if (const UnitState* t = s.target(); t && t->isAlive() && !s.isAttacker(*t))
+    {
+        ctx.actions.execute(actions::TargetClear);
+    }
 }
 
 void LootBehavior::onExit(BotContext& ctx)
@@ -224,7 +239,9 @@ void LootBehavior::selectNext(const GameSnapshot& s, BotContext& ctx)
             continue;
         }
 
-        const float d = distance(s.player.position, p.position);
+        const UnitState* u = s.findUnit(p.guid);
+        const bool isQuestCorpse = u && ctx.questNeeds(u->entry);
+        const float d = distance(s.player.position, p.position) - (isQuestCorpse ? 1000.0f : 0.0f);
 
         if (d < best)
         {
@@ -392,6 +409,21 @@ BehaviorStatus LootBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 
     const TimePoint now = ctx.now();
     const UnitState* unit = s.findUnit(current_);
+    const auto pending = std::find_if(ctx.pendingLoot.begin(), ctx.pendingLoot.end(), [&](const PendingLoot& p) { return p.guid == current_; });
+
+    // When under attack, only quest corpses are looted immediately before fighting
+    if (!s.attackers().empty() && (!unit || !ctx.questNeeds(unit->entry)))
+    {
+        if (pending != ctx.pendingLoot.end())
+        {
+            pending->inProgress = false;
+        }
+
+        ctx.objectives.pop("LootCorpse");
+        ctx.navigator.stop();
+        current_ = 0;
+        return BehaviorStatus::Failure;
+    }
 
     if (const int carried = carriedItems(s.player); carried != lastCarried_)
     {
@@ -475,8 +507,6 @@ BehaviorStatus LootBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         return BehaviorStatus::Running;
     }
 
-    const auto pending = std::find_if(ctx.pendingLoot.begin(), ctx.pendingLoot.end(), [&](const PendingLoot& p) { return p.guid == current_; });
-
     if (s.player.isCasting)
     {
         ctx.seekTook(current_);
@@ -509,7 +539,7 @@ BehaviorStatus LootBehavior::tick(const GameSnapshot& s, BotContext& ctx)
     {
         // A quest's mob back at once by its corpse (Garrick Padfoot): guarded
         // for ever, and pulled for ever. What the quest needs is taken all the same.
-        const bool needed = ctx.questNeeds(unit->entry) && ctx.fastRespawnAt(unit->position, unit->entry);
+        const bool needed = ctx.questNeeds(unit->entry);
 
         if (lootAttempts_ + skinAttempts_ == 0 && !needed && ctx.corpseGuarded(s, unit->position))
         {

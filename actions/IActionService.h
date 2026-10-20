@@ -98,6 +98,8 @@ public:
     virtual bool isReady(std::string_view action) const = 0;
     // Bound and off its own cooldown; ignores the shared global cooldown.
     virtual bool isReadyIgnoringGlobalCooldown(std::string_view action) const = 0;
+    // Remaining cooldown on the action (Duration(0) when ready).
+    virtual Duration cooldownRemaining(std::string_view action) const = 0;
     // A spell was pressed less than a global cooldown ago.
     virtual bool onGlobalCooldown() const = 0;
     // Forgets an action's cooldown so it can be issued again right away. For

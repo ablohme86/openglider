@@ -72,6 +72,14 @@ actions:
   Pet.Aggressive:
     chat: "/petaggressive"
     cooldown: 1.0
+  Pet.RevivePet:
+    gcd: true
+    castTime: 10.0
+    cooldown: 15
+  Pet.Revive:
+    gcd: true
+    castTime: 10.0
+    cooldown: 15
 
   # --- warrior ----------------------------------------------------------------
   Warrior.AutoAttack:

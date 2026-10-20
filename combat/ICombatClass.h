@@ -139,6 +139,12 @@ public:
         return 5.0f;
     }
 
+    // Whether this combat class fights or pulls from range (combatRange > 5 or ranged pull).
+    virtual bool isRanged() const
+    {
+        return settings().combatRange > 5.0f;
+    }
+
     // True when the rotation itself goes for a melee swing (an auto attack
     // rule), so the bot walks to the target instead of waiting for it to come.
     // Auto attack switched on by some other ability does not count.
