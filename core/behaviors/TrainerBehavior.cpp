@@ -102,26 +102,76 @@ bool somethingToSell(const GameSnapshot& s, const BotContext& ctx)
 // The lines of the trainer window's list, top first: the frames inside its
 // inset as wide as a row and one row high. On 1.60.1 the window shows six,
 // only what can be learned now (Maximillian Crowe, Goldshire).
+// On Classic Era (1.15.x / 1.12), the frame uses ClassTrainerSkill1..11 without
+// an inset; category headers ("Holy") have no leading spaces, while learnable
+// skills start with two spaces and are green (or white when selected).
 std::vector<UiFrame> trainerRows(BotContext& ctx)
 {
     std::vector<UiFrame> rows;
-    const auto inset = ctx.provider->uiFrame("ClassTrainerFrameInset");
 
-    if (!inset || !inset->visible)
+    if (!ctx.provider)
     {
         return rows;
     }
 
-    const float width = inset->right - inset->left;
+    const auto inset = ctx.provider->uiFrame("ClassTrainerFrameInset");
 
-    for (const UiFrame& f : ctx.provider->uiFramesWithText("ClassTrainerFrame", ""))
+    if (inset && inset->visible)
     {
-        const float height = f.bottom - f.top;
+        const float width = inset->right - inset->left;
 
-        if (f.visible && f.left >= inset->left - 0.005f && f.right <= inset->right + 0.005f && f.top >= inset->top - 0.005f && f.bottom <= inset->bottom + 0.005f && f.right - f.left > width * 0.7f && height > 0.03f && height < 0.09f)
+        for (const UiFrame& f : ctx.provider->uiFramesWithText("ClassTrainerFrame", ""))
         {
-            rows.push_back(f);
+            const float height = f.bottom - f.top;
+
+            if (f.visible && f.left >= inset->left - 0.005f && f.right <= inset->right + 0.005f && f.top >= inset->top - 0.005f && f.bottom <= inset->bottom + 0.005f && f.right - f.left > width * 0.7f && height > 0.03f && height < 0.09f)
+            {
+                rows.push_back(f);
+            }
         }
+
+        std::sort(rows.begin(), rows.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
+        return rows;
+    }
+
+    if (!ctx.uiFrameVisible("ClassTrainerFrame"))
+    {
+        return rows;
+    }
+
+    for (int i = 1; i <= 11; ++i)
+    {
+        const std::string name = std::format("ClassTrainerSkill{}", i);
+        const auto frame = ctx.provider->uiFrame(name);
+
+        if (!frame || !frame->visible)
+        {
+            continue;
+        }
+
+        const std::string textName = std::format("{}Text", name);
+        const auto text = ctx.provider->uiText(name, textName);
+
+        if (!text || !text->starts_with("  "))
+        {
+            continue;
+        }
+
+        const auto color = ctx.provider->uiTextColor(name, textName);
+
+        if (color)
+        {
+            const std::uint32_t c = *color;
+            const std::uint8_t green = static_cast<std::uint8_t>((c >> 8) & 0xFF);
+            const std::uint8_t red = static_cast<std::uint8_t>((c >> 16) & 0xFF);
+
+            if (red > 0xC0 && green < 0x50)
+            {
+                continue;
+            }
+        }
+
+        rows.push_back(*frame);
     }
 
     std::sort(rows.begin(), rows.end(), [](const UiFrame& a, const UiFrame& b) { return a.top < b.top; });
@@ -591,6 +641,13 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 
     case Stage::Gossip:
     {
+        if (ctx.uiFrameVisible("ClassTrainerFrame"))
+        {
+            stage_ = Stage::Training;
+            stageStarted_ = stepAt_ = now;
+            return BehaviorStatus::Running;
+        }
+
         if (ctx.uiFrameVisible("GossipFrame"))
         {
             if (now - stepAt_ < kGossipAnswer && stepAt_ > stageStarted_)
@@ -604,9 +661,22 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             // text, not a paragraph.
             for (std::string_view phrase : {"training", "train", "teach", "ausbild", "lehr", "entraîn", "formation", "entren", "trein", "обуч", "трениров", "수련", "훈련", "訓練", "训练"})
             {
+                std::vector<UiFrame> candidates;
                 for (const UiFrame& line : ctx.provider->uiFramesWithText("GossipFrame", phrase))
                 {
-                    if (line.visible && line.bottom - line.top < 0.03f && clickAt(ctx, line))
+                    if (line.visible && line.bottom - line.top < 0.06f)
+                    {
+                        candidates.push_back(line);
+                    }
+                }
+
+                if (!candidates.empty())
+                {
+                    std::sort(candidates.begin(), candidates.end(), [](const UiFrame& a, const UiFrame& b) {
+                        return (a.bottom - a.top) < (b.bottom - b.top);
+                    });
+
+                    if (clickAt(ctx, candidates.front()))
                     {
                         ctx.log.info(logcat::Profile, "train abilities: chose the trainer's line ('{}')", phrase);
                         stepAt_ = now;
@@ -735,12 +805,31 @@ BehaviorStatus TrainerBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return BehaviorStatus::Running;
         }
 
-        if (ctx.uiFrameVisible("ClassTrainerTrainButton") && ctx.clickUiFrame("ClassTrainerTrainButton"))
+        if (ctx.uiFrameVisible("ClassTrainerTrainButton"))
         {
-            moneyBefore_ = s.player.money;
-            trainClicked_ = true;
-            ++trainClicks_;
-            stepAt_ = now;
+            if (const auto btnColor = ctx.provider->uiTextColor("ClassTrainerTrainButton", "ClassTrainerTrainButtonText"))
+            {
+                const std::uint8_t red = static_cast<std::uint8_t>((*btnColor >> 16) & 0xFF);
+                const std::uint8_t green = static_cast<std::uint8_t>((*btnColor >> 8) & 0xFF);
+                const std::uint8_t blue = static_cast<std::uint8_t>(*btnColor & 0xFF);
+
+                // Gray text (~0x808080) indicates the train button is disabled
+                if (red <= 0x90 && green <= 0x90 && blue <= 0x90)
+                {
+                    rowClicked_ = false;
+                    ++row_;
+                    stepAt_ = now;
+                    return BehaviorStatus::Running;
+                }
+            }
+
+            if (ctx.clickUiFrame("ClassTrainerTrainButton"))
+            {
+                moneyBefore_ = s.player.money;
+                trainClicked_ = true;
+                ++trainClicks_;
+                stepAt_ = now;
+            }
         }
 
         return BehaviorStatus::Running;

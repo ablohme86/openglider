@@ -136,6 +136,7 @@ public:
     }
 
     std::optional<std::string> uiText(std::string_view frame, std::string_view fontString) override;
+    std::optional<std::uint32_t> uiTextColor(std::string_view frame, std::string_view fontString) override;
     std::optional<UiFrame> uiRegion(std::string_view frame, std::string_view region) override;
     std::optional<ActionCooldown> actionCooldown(int slot) override;
     std::optional<UiFrame> uiFrameWithText(std::string_view under, std::string_view text) override;

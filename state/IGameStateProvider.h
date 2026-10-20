@@ -206,6 +206,14 @@ public:
         return std::nullopt;
     }
 
+    // The packed ARGB color of a frame's FontString.
+    virtual std::optional<std::uint32_t> uiTextColor(std::string_view frame, std::string_view fontString)
+    {
+        (void)frame;
+        (void)fontString;
+        return std::nullopt;
+    }
+
     // What the button showing an action bar slot tells of its cooldown, read
     // from the client instead of counted from the bot's own key presses.
     // nullopt where it cannot be read (no button shown for the slot, or a

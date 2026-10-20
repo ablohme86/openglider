@@ -1294,6 +1294,38 @@ std::optional<std::string> ModernClientReader::uiText(std::string_view frame, st
     return std::nullopt;
 }
 
+std::optional<std::uint32_t> ModernClientReader::uiTextColor(std::string_view frame, std::string_view fontString) const
+{
+    if (!L_.uiTop || !L_.uiFontStringColor)
+    {
+        return std::nullopt;
+    }
+
+    const std::uint64_t parent = findUiObject(frame);
+
+    if (!parent)
+    {
+        return std::nullopt;
+    }
+
+    const std::uint64_t head = parent + L_.uiFrameRegions;
+    auto node = memory_.read<std::uint64_t>(head);
+
+    for (int i = 0; i < 500 && node && *node && *node != head; ++i)
+    {
+        const std::uint64_t region = *node - L_.uiRegionLink;
+
+        if (uiObjectNamed(region, fontString))
+        {
+            return memory_.read<std::uint32_t>(region + L_.uiFontStringColor);
+        }
+
+        node = memory_.read<std::uint64_t>(*node);
+    }
+
+    return std::nullopt;
+}
+
 std::optional<std::string> ModernClientReader::minimapZoneText() const
 {
     if (!L_.uiTop || !L_.uiFontStringText)

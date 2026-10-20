@@ -179,6 +179,19 @@ public:
         return it->second;
     }
 
+    std::map<std::string, std::uint32_t, std::less<>> uiTextColors;
+    std::optional<std::uint32_t> uiTextColor(std::string_view frame, std::string_view fontString) override
+    {
+        const auto it = uiTextColors.find(std::string(frame) + "/" + std::string(fontString));
+
+        if (it == uiTextColors.end())
+        {
+            return std::nullopt;
+        }
+
+        return it->second;
+    }
+
     std::function<std::optional<Camera>()> cameraFunc;
     std::optional<Camera> camera() const override
     {

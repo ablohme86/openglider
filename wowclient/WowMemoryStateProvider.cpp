@@ -3491,6 +3491,16 @@ std::optional<std::string> WowMemoryStateProvider::uiText(std::string_view frame
     return modern_->uiText(frame, fontString);
 }
 
+std::optional<std::uint32_t> WowMemoryStateProvider::uiTextColor(std::string_view frame, std::string_view fontString)
+{
+    if (!modern_ || !memory_->attached())
+    {
+        return std::nullopt;
+    }
+
+    return modern_->uiTextColor(frame, fontString);
+}
+
 std::vector<UiFrame> WowMemoryStateProvider::uiFramesWithText(std::string_view under, std::string_view text)
 {
     if (!modern_ || !memory_->attached())

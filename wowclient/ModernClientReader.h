@@ -89,6 +89,7 @@ public:
     // A UI frame by name, where the layout knows the client's UI (uiTop).
     std::optional<UiFrame> uiFrame(std::string_view name) const;
     std::optional<std::string> uiText(std::string_view frame, std::string_view fontString) const;
+    std::optional<std::uint32_t> uiTextColor(std::string_view frame, std::string_view fontString) const;
     // The minimap's zone text: the subzone the character stands in
     // ("Northshire Valley"), or the zone where it is in none. Its font string
     // sits in a frame without a global name, so it is looked for once and
