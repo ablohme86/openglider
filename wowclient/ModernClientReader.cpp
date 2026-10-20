@@ -584,17 +584,26 @@ void ModernClientReader::readKnownTaxiNodes(const Object& obj, PlayerState& p) c
     const auto array = memory_.read<std::uint64_t>(obj.base + L_.playerKnownTaxiNodes);
     const auto length = memory_.read<std::uint32_t>(obj.base + L_.playerKnownTaxiNodes + 8);
 
-    // 64 bytes on 1.60.1 (flight points up to 512); more is no bit array.
-    if (!array || !length || *length > 4096)
+    std::vector<std::uint8_t> bits;
+
+    // Pointer to dynamic bit array (WoW Forever 1.60.1: pointer at +0, length at +8)
+    if (array && length && isPointer(*array) && *length > 0 && *length <= 4096)
     {
-        return;
+        bits.resize(*length);
+        if (!memory_.read(*array, bits.data(), bits.size()))
+        {
+            return;
+        }
     }
-
-    std::vector<std::uint8_t> bits(*length);
-
-    if (*length > 0 && (!*array || !memory_.read(*array, bits.data(), bits.size())))
+    else
     {
-        return;
+        // Fixed inline bit array on the player object (Classic Era 1.15.9: 64 bytes for 512 flight points)
+        constexpr std::size_t kInlineNodesBytes = 64;
+        bits.resize(kInlineNodesBytes);
+        if (!memory_.read(obj.base + L_.playerKnownTaxiNodes, bits.data(), bits.size()))
+        {
+            return;
+        }
     }
 
     std::vector<std::uint32_t> known;
@@ -1637,7 +1646,7 @@ std::vector<UiFrame> ModernClientReader::uiFramesWithText(std::string_view under
 {
     std::vector<UiFrame> out;
 
-    if (!L_.uiTop || !L_.uiFontStringText || !L_.uiObjectParent)
+    if (!L_.uiTop || !L_.uiObjectParent)
     {
         return out;
     }
@@ -1685,32 +1694,73 @@ std::vector<UiFrame> ModernClientReader::uiFramesWithText(std::string_view under
             continue;
         }
 
-        const std::uint64_t regions = object + L_.uiFrameRegions;
-        auto r = memory_.read<std::uint64_t>(regions);
-        std::unordered_set<std::uint64_t> seen;
-
-        for (int j = 0; j < 64 && r && *r && *r != regions && seen.insert(*r).second; ++j)
+        // 1) Direct FontString on a frame or button (Classic Era 1.15.9: FontString at +0x1A0 or +0x1A8, text pointer at +0x98)
+        bool matched = false;
+        for (const std::uint32_t directOff : {0x1A0u, 0x1A8u})
         {
-            const std::uint64_t region = *r - L_.uiRegionLink;
-            r = memory_.read<std::uint64_t>(*r);
-            const auto at = memory_.read<std::uint64_t>(region + L_.uiFontStringText);
-
-            if (!at || !isPointer(*at))
+            if (const auto reg = memory_.read<std::uint64_t>(object + directOff); reg && isPointer(*reg))
             {
-                continue;
-            }
-
-            // Titles come coloured ("|cff000000Wolves Across the Border|r") or with a level.
-            const std::string shown = memory_.readString(*at, 256);
-
-            if (text.empty() ? !shown.empty() : uiTextContains(shown, text))
-            {
-                if (const auto frame = frameOf(object))
+                for (const std::uint32_t strOff : {L_.uiFontStringText, 0x98u})
                 {
-                    out.push_back(*frame);
+                    if (strOff)
+                    {
+                        if (const auto at = memory_.read<std::uint64_t>(*reg + strOff); at && isPointer(*at))
+                        {
+                            const std::string shown = memory_.readString(*at, 256);
+                            if (text.empty() ? !shown.empty() : uiTextContains(shown, text))
+                            {
+                                if (const auto frame = frameOf(object))
+                                {
+                                    out.push_back(*frame);
+                                    matched = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (matched)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (matched)
+        {
+            continue;
+        }
+
+        // 2) Linked regions list (WoW Forever 1.60.1: uiFrameRegions ring)
+        if (L_.uiFrameRegions && L_.uiFontStringText)
+        {
+            const std::uint64_t regions = object + L_.uiFrameRegions;
+            auto r = memory_.read<std::uint64_t>(regions);
+            std::unordered_set<std::uint64_t> seen;
+
+            for (int j = 0; j < 64 && r && *r && *r != regions && seen.insert(*r).second; ++j)
+            {
+                const std::uint64_t region = *r - L_.uiRegionLink;
+                r = memory_.read<std::uint64_t>(*r);
+                const auto at = memory_.read<std::uint64_t>(region + L_.uiFontStringText);
+
+                if (!at || !isPointer(*at))
+                {
+                    continue;
                 }
 
-                break;
+                // Titles come coloured ("|cff000000Wolves Across the Border|r") or with a level.
+                const std::string shown = memory_.readString(*at, 256);
+
+                if (text.empty() ? !shown.empty() : uiTextContains(shown, text))
+                {
+                    if (const auto frame = frameOf(object))
+                    {
+                        out.push_back(*frame);
+                    }
+
+                    break;
+                }
             }
         }
     }
@@ -1787,7 +1837,11 @@ std::vector<UiBagSlot> ModernClientReader::uiBagSlots() const
 
         node = field<std::uint64_t>(block.data(), L_.uiObjectLink);
 
-        if (field<std::uint64_t>(block.data(), 0) != imageBase_ + L_.uiBagButtonVtable || field<std::uint64_t>(block.data(), L_.uiObjectName) != 0 || !parents.contains(field<std::uint64_t>(block.data(), L_.uiObjectParent)) || !(field<std::uint32_t>(block.data(), L_.uiObjectFlags) & L_.uiVisibleMask))
+        const auto nameAt = field<std::uint64_t>(block.data(), L_.uiObjectName);
+        const auto name = nameAt ? memory_.readString(nameAt, 64) : std::string{};
+        const bool isBagItem = name.empty() || name.find("Item") != std::string::npos;
+
+        if (field<std::uint64_t>(block.data(), 0) != imageBase_ + L_.uiBagButtonVtable || !isBagItem || !parents.contains(field<std::uint64_t>(block.data(), L_.uiObjectParent)) || !(field<std::uint32_t>(block.data(), L_.uiObjectFlags) & L_.uiVisibleMask))
         {
             continue;
         }

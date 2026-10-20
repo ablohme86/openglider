@@ -367,10 +367,10 @@ private:
     std::vector<dtPolyRef> closed_;
 };
 
-void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater, bool tall = false)
+void setCosts(dtQueryFilter& filter, float span, bool roads, bool avoidWater, bool tall = false, float roadThreshold = kRoadNearGoal)
 {
-    const bool far = span > kRoadNearGoal;
-    const float ground = far && roads ? 1 / (span > kLongRoadFrom ? kLongRoadCost : kRoadCost) : 1.0f;
+    const bool far = span > roadThreshold;
+    const float ground = far && roads ? 1 / (span > std::max(kLongRoadFrom, roadThreshold * 2.0f) ? kLongRoadCost : kRoadCost) : 1.0f;
     filter.setAreaCost(0, ground);
     filter.setAreaCost(1, kSteepCost * ground);
     filter.setAreaCost(2, far && roads ? 1.0f : ground);
@@ -980,7 +980,7 @@ struct ClientNavigationProvider::Impl
     // points from `from` on; empty when there is none. The window round the
     // two widens until a way is found or it holds too many tiles; past what
     // one window holds, the way towards a point on the straight line.
-    std::vector<Vec3> coarseWay(const Vec3& from, const Vec3& to, const ObstacleMemory::Calculation& calculation, bool roads, bool avoidWater)
+    std::vector<Vec3> coarseWay(const Vec3& from, const Vec3& to, const ObstacleMemory::Calculation& calculation, bool roads, bool avoidWater, float roadThreshold = kRoadNearGoal)
     {
         if (!coarseMesh)
         {
@@ -1039,7 +1039,7 @@ struct ClientNavigationProvider::Impl
 
             dtQueryFilter filter;
             filter.setIncludeFlags(1);
-            setCosts(filter, distance2D(from, to), roads, avoidWater);
+            setCosts(filter, distance2D(from, to), roads, avoidWater, false, roadThreshold);
             const auto roadGoal = roads && clipped ? coarseRoadGoal(goal, from, to, kCoarse.tile) : std::nullopt;
             // A nearby road may belong to a disconnected surface. Retain the
             // original endpoint as a fallback rather than losing a valid way.
@@ -1338,7 +1338,7 @@ std::optional<Path> ClientNavigationProvider::findPath(const Vec3& from, const V
             dtPolyRef first = 0, last = 0;
             dtQueryFilter filter;
             filter.setIncludeFlags(1);
-            setCosts(filter, distance2D(from, to), useRoads_, avoidWater_, tall_);
+            setCosts(filter, distance2D(from, to), useRoads_, avoidWater_, tall_, roadThreshold_.load());
             // What the caller asked this way to keep out of (setAvoiding).
             std::vector<Closed::Circle> circles;
 
@@ -1638,7 +1638,7 @@ std::optional<Path> ClientNavigationProvider::findPath(const Vec3& from, const V
             // Once to a far destination: how much of the way is road, and how
             // much road the map round it has. None at all: the ground's road
             // textures were not recognised there.
-            if (distance2D(from, to) > kRoadNearGoal && (!i.roadsSaidFor || distance(*i.roadsSaidFor, to) > 1))
+            if (distance2D(from, to) > roadThreshold_.load() && (!i.roadsSaidFor || distance(*i.roadsSaidFor, to) > 1))
             {
                 i.roadsSaidFor = to;
                 const auto areaOf = [&](dtPolyRef ref)
@@ -1809,7 +1809,7 @@ std::optional<Path> ClientNavigationProvider::findPath(const Vec3& from, const V
         // than every tile of the square both ends lie in - the whole way where
         // those fit the mesh, and else a leg as far along it as they do,
         // planned again at its end. A nearer point when that fails.
-        const auto way = i.coarseWay(from, to, calculation, useRoads_, avoidWater_);
+        const auto way = i.coarseWay(from, to, calculation, useRoads_, avoidWater_, roadThreshold_.load());
 
         if (way.size() >= 2)
         {

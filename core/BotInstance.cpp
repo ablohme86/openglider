@@ -348,6 +348,7 @@ void BotInstance::tickOnce()
     const auto& seen = engine_.lastSnapshot();
     const bool ghost = seen && seen->player.isDeadOrGhost();
     navigation->setUseRoads(config_.useRoads && !ghost && !(!config_.quest.enabled && engine_.currentName() == "Navigation"));
+    navigation->setRoadThreshold(static_cast<float>(config_.useRoadsThresholdYards));
     // Over a bridge rather than through the water - but not on a corpse run.
     navigation->setAvoidWater(!ghost);
     // A tauren (race 6) is too tall for the low eaves others pass under.

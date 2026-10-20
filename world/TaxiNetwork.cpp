@@ -31,11 +31,12 @@ namespace og
 namespace
 {
 
-// The layouts read (WoW Forever 1.60.1, build 70450). TaxiPath: ID,
-// FromTaxiNode, ToTaxiNode, Cost. TaxiPathNode: Loc[3], ID, PathID,
+// The layouts read (WoW Forever 1.60.1, build 70450; Classic Era 1.15.9, build 70003).
+// TaxiPath: ID, FromTaxiNode, ToTaxiNode, Cost. TaxiPathNode: Loc[3], ID, PathID,
 // NodeIndex, ContinentID, Flags, Delay, ...
 constexpr std::uint32_t kTaxiPathLayout = 0xA303DE51;
-constexpr std::uint32_t kTaxiPathNodeLayout = 0xFE362E70;
+constexpr std::uint32_t kTaxiPathNodeLayout = 0xFE362E70;           // WoW Forever 1.60.1
+constexpr std::uint32_t kTaxiPathNodeLayoutClassicEra = 0xBB94AA30; // Classic Era 1.15.9
 
 float asFloat(std::uint32_t v)
 {
@@ -64,7 +65,9 @@ std::optional<TaxiNetwork> TaxiNetwork::fromDb2(std::span<const std::uint8_t> ta
         return std::nullopt;
     }
 
-    if (paths->layoutHash() != kTaxiPathLayout || points->layoutHash() != kTaxiPathNodeLayout)
+    const bool validPathNodeLayout = (points->layoutHash() == kTaxiPathNodeLayout || points->layoutHash() == kTaxiPathNodeLayoutClassicEra);
+
+    if (paths->layoutHash() != kTaxiPathLayout || !validPathNodeLayout)
     {
         error = std::format("TaxiPath layout {:08X} / TaxiPathNode layout {:08X} are not ones the bot knows", paths->layoutHash(), points->layoutHash());
         return std::nullopt;

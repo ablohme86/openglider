@@ -382,6 +382,10 @@ public:
 
     void setClientNavigation(std::unique_ptr<INavigationProvider> provider)
     {
+        if (provider)
+        {
+            provider->setRoadThreshold(static_cast<float>(config_.useRoadsThresholdYards));
+        }
         clientNavigation_ = std::move(provider);
     }
 

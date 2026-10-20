@@ -34,6 +34,8 @@ namespace og::wowclient
 // wording; a line worded otherwise leaves its value unknown.
 struct SpellTooltipData
 {
+    // "10 sec cooldown", "2 min cooldown"
+    std::optional<Duration> cooldown;
     // "2 sec cast", "Instant"; unknown for a channelled spell, whose line
     // gives no time.
     std::optional<Duration> castTime;

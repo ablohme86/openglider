@@ -92,6 +92,11 @@ public:
         useRoads_ = on;
     }
 
+    void setRoadThreshold(float yards) override
+    {
+        roadThreshold_ = std::max(0.0f, yards);
+    }
+
     void setAvoidWater(bool on) override
     {
         avoidWater_ = on;
@@ -123,6 +128,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
     std::atomic<bool> useRoads_{true};
+    std::atomic<float> roadThreshold_{150.0f};
     std::atomic<bool> tall_{false};
     std::atomic<bool> avoidWater_{true};
     std::vector<Avoided> avoiding_;
