@@ -1699,26 +1699,32 @@ std::vector<UiFrame> ModernClientReader::uiFramesWithText(std::string_view under
             continue;
         }
 
-        // 1) Direct FontString on a frame or button (Classic Era 1.15.9: FontString at +0x1A0 or +0x1A8, text pointer at +0x98)
+        // 1) Direct FontString on a frame or button (Classic Era 1.15.9: FontString at +0x1A0 or +0x1A8, text pointer at 0x1E0/0x98)
         bool matched = false;
         if (L_.uiDirectFontString)
         {
-            const std::uint32_t textOffset = L_.uiFontStringText ? L_.uiFontStringText : 0x98u;
             for (const std::uint32_t directOff : {L_.uiFrameRegions ? L_.uiFrameRegions : 0x1A0u, 0x1A8u})
             {
                 if (const auto reg = memory_.read<std::uint64_t>(object + directOff); reg && isPointer(*reg))
                 {
-                    if (const auto at = memory_.read<std::uint64_t>(*reg + textOffset); at && isPointer(*at))
+                    for (const std::uint32_t textOffset : {L_.uiFontStringText, 0x1E0u, 0x98u})
                     {
-                        const std::string shown = memory_.readString(*at, 256);
-                        if (text.empty() ? !shown.empty() : uiTextContains(shown, text))
+                        if (!textOffset)
                         {
-                            if (const auto frame = frameOf(object))
+                            continue;
+                        }
+                        if (const auto at = memory_.read<std::uint64_t>(*reg + textOffset); at && isPointer(*at))
+                        {
+                            const std::string shown = memory_.readString(*at, 256);
+                            if (text.empty() ? !shown.empty() : uiTextContains(shown, text))
                             {
-                                out.push_back(*frame);
-                                matched = true;
+                                if (const auto frame = frameOf(object))
+                                {
+                                    out.push_back(*frame);
+                                    matched = true;
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
