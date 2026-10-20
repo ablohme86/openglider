@@ -59,6 +59,11 @@ constexpr float kPullOvershoot = 0.9f;
 // has to be chased again.
 constexpr float kChaseMargin = 0.85f;
 
+inline float cfgPullFloor(const BotContext& ctx) { return ctx.config.pullFloor > 0.0f ? ctx.config.pullFloor : kPullFloor; }
+inline float cfgMeleeReach(const BotContext& ctx) { return ctx.config.meleeReach > 0.0f ? ctx.config.meleeReach : kMeleeReach; }
+inline float cfgPullOvershoot(const BotContext& ctx) { return ctx.config.pullOvershoot > 0.0f ? ctx.config.pullOvershoot : kPullOvershoot; }
+inline float cfgChaseMargin(const BotContext& ctx) { return ctx.config.chaseMargin > 0.0f ? ctx.config.chaseMargin : kChaseMargin; }
+
 // A pull that has not drawn the mob by now did not go off: a shot or spell
 // lands well within this, and a mob it hit is in combat at once.
 constexpr Duration kPullNoEffect{3000};
@@ -163,14 +168,15 @@ bool combatFiresAt(const UnitState& unit, const GameSnapshot& s, BotContext& ctx
 // distances, since a ranged pull can have a minimum range (Auto Shot's 8).
 bool pullFiresCloser(const UnitState& unit, const GameSnapshot& s, BotContext& ctx, float dist)
 {
-    if (dist <= kPullFloor)
+    const float floor = cfgPullFloor(ctx);
+    if (dist <= floor)
     {
         return false;
     }
 
     const bool rangedClass = ctx.combatClass && ctx.combatClass->settings().combatRange > 5.0f;
 
-    for (const float d : {kPullFloor, 5.0f, 10.0f, 20.0f})
+    for (const float d : {floor, 5.0f, 10.0f, 20.0f})
     {
         if (d >= dist)
         {
@@ -587,8 +593,11 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
     // walked in to 1.5 yards - it hit from 2.5 and stepped about, and the bot
     // ran round it in circles, never in front of it to Tab, until it died.
     // In to the floor only when Tab has failed a couple of times.
-    const float aggroApproach = tabAttempts_ >= 2 ? kPullFloor : kMeleeReach - 1.0f;
-    const float approachTarget = hasAggro ? aggroApproach : std::max(kPullFloor, unit.isFleeing ? maxAcquireDist * 0.8f : tabFrom * std::max(0.25f, 1.0f - tabAttempts_ * 0.19f));
+    const float floor = cfgPullFloor(ctx);
+    const float melee = cfgMeleeReach(ctx);
+    const float chase = cfgChaseMargin(ctx);
+    const float aggroApproach = tabAttempts_ >= 2 ? floor : melee - 1.0f;
+    const float approachTarget = hasAggro ? aggroApproach : std::max(floor, unit.isFleeing ? maxAcquireDist * 0.8f : tabFrom * std::max(0.25f, 1.0f - tabAttempts_ * 0.19f));
 
     if (faceWhileCasting(unit, s, ctx, 0.3f))
     {
@@ -597,12 +606,12 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
 
     // Out of sight - behind a wall, upstairs - it is walked to until it is in
     // sight, however near: Tab does not take what the character cannot see.
-    const bool outOfSight = !hasAggro && dist > kMeleeReach && walkForSight(unit, s, ctx, dist);
+    const bool outOfSight = !hasAggro && dist > melee && walkForSight(unit, s, ctx, dist);
     // Once walking, on in to the chase margin before stopping: a whelp
     // wandering off at the edge of Tab's reach was followed a step at a time,
     // Forward pressed and let go every few tenths of a second.
     // A runner is caught at melee reach as it is, without the margin.
-    const float margin = unit.isFleeing ? approachTarget : std::max(kPullFloor, approachTarget * kChaseMargin);
+    const float margin = unit.isFleeing ? approachTarget : std::max(floor, approachTarget * chase);
 
     if (dist > maxAcquireDist || outOfSight)
     {
@@ -620,7 +629,7 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
         // on the map (2D) and the reach by the slope (3D), and on a hillside
         // the bot stopped 30.2 yd off for a reach of 30, stepping and
         // stopping as the mob walked off.
-        if (ctx.navigator.moveTo(s, unit.position, outOfSight ? kPullFloor : margin) == NavStatus::Unreachable)
+        if (ctx.navigator.moveTo(s, unit.position, outOfSight ? floor : margin) == NavStatus::Unreachable)
         {
             ctx.navigator.stop();
             ctx.blacklistTarget(unit.guid, unit.name, "unreachable", seconds(300));
@@ -763,12 +772,17 @@ BehaviorStatus CombatBehavior::pull(const UnitState& unit, const GameSnapshot& s
     // cooldown is what holds it back, when walking in only draws aggro.
     const bool outsidePullRange = dist > pullReach;
     const bool busy = s.player.isCasting || ctx.actions.isCasting() || ctx.actions.onGlobalCooldown() || s.player.isShooting || (autoRepeatStartedAt_ && now - *autoRepeatStartedAt_ < Duration(800));
+    const float floor = cfgPullFloor(ctx);
+    const float melee = cfgMeleeReach(ctx);
+    const float chase = cfgChaseMargin(ctx);
+    const float overshoot = cfgPullOvershoot(ctx);
+
     // Auto attack already on (switched on by hand, or by a rule from farther
     // out) swings only in melee, and its rule no longer fires to say so.
-    const bool swingingFromAfar = s.player.isAutoAttacking && dist > kMeleeReach;
+    const bool swingingFromAfar = s.player.isAutoAttacking && dist > melee;
     // Out of reach: chase in to the margin, even past where a rule would
     // start to fire, rather than stop on the edge of its range.
-    const float chaseStop = std::max(kPullFloor, pullReach * kChaseMargin);
+    const float chaseStop = std::max(floor, pullReach * chase);
 
     if (outsidePullRange)
     {
@@ -785,7 +799,7 @@ BehaviorStatus CombatBehavior::pull(const UnitState& unit, const GameSnapshot& s
     const bool canCloseCloser = (!pullActionExecuted_ || drewNothing) && pullFiresCloser(unit, s, ctx, dist);
     // Out of sight a ranged pull does nothing ("not in line of sight"): in
     // until the mob is in sight, a few yards at a time.
-    const bool outOfSight = !busy && !s.inCombat() && !unit.inCombat && dist > kMeleeReach && walkForSight(unit, s, ctx, dist);
+    const bool outOfSight = !busy && !s.inCombat() && !unit.inCombat && dist > melee && walkForSight(unit, s, ctx, dist);
 
     if (pullChase_ || outOfSight || (!readyToPull && (outsidePullRange || (!busy && (swingingFromAfar || canCloseCloser)))))
     {
@@ -802,7 +816,7 @@ BehaviorStatus CombatBehavior::pull(const UnitState& unit, const GameSnapshot& s
 
         // Outside: close to the pull reach. Inside: a few yards at a time, re-checking
         // the pull rules every tick so the walk ends the moment one fires.
-        const float stopAt = pullChase_ ? chaseStop : std::max(kPullFloor, dist - 3.0f);
+        const float stopAt = pullChase_ ? chaseStop : std::max(floor, dist - 3.0f);
         const NavStatus st = ctx.navigator.moveTo(s, unit.position, stopAt);
 
         if (st == NavStatus::Unreachable)
@@ -820,9 +834,9 @@ BehaviorStatus CombatBehavior::pull(const UnitState& unit, const GameSnapshot& s
     if (readyToPull && pullWalking_)
     {
         pullWalking_ = false;
-        const float closeTo = dist * kPullOvershoot;
+        const float closeTo = dist * overshoot;
 
-        if (closeTo > kPullFloor && pullFiresAt(unit, s, ctx, closeTo))
+        if (closeTo > floor && pullFiresAt(unit, s, ctx, closeTo))
         {
             pullCloseTo_ = closeTo;
         }
@@ -941,7 +955,7 @@ void CombatBehavior::leaveDeadZone(const UnitState& unit, const GameSnapshot& s,
     constexpr std::array<float, 3> kOutTo{8.0f + kBodiesReach + 2.0f, 8.0f + kBodiesReach + 4.0f, 8.0f + kBodiesReach + 7.0f};
     const TimePoint now = ctx.now();
 
-    if (dist <= kMeleeReach || deadZoneIn_ || scriptMove_ || ctx.scriptMove || (deadZoneOf_ == unit.guid && now - deadZoneAt_ < kDeadZoneEvery))
+    if (dist <= cfgMeleeReach(ctx) || deadZoneIn_ || scriptMove_ || ctx.scriptMove || (deadZoneOf_ == unit.guid && now - deadZoneAt_ < kDeadZoneEvery))
     {
         return;
     }
@@ -1070,7 +1084,7 @@ BehaviorStatus CombatBehavior::fight(const UnitState& unit, const GameSnapshot& 
     const bool swinging = ctx.combatClass && ctx.combatClass->wantsMeleeSwing(cc);
     // Out of range: chase in to the margin, not just back over the edge, or a
     // target walking away is followed a step at a time.
-    const float chaseStop = std::max(1.0f, combatRange * kChaseMargin);
+    const float chaseStop = std::max(1.0f, combatRange * cfgChaseMargin(ctx));
 
     if (dist > combatRange)
     {
@@ -1186,7 +1200,7 @@ bool CombatBehavior::walkForSight(const UnitState& unit, const GameSnapshot& s, 
 
     if (std::exchange(sightLost_, false))
     {
-        sightWalkTo_ = std::max(kPullFloor, dist - kPastTheEdge);
+        sightWalkTo_ = std::max(cfgPullFloor(ctx), dist - kPastTheEdge);
     }
 
     if (sightWalkTo_ && dist > *sightWalkTo_)
@@ -1253,7 +1267,7 @@ bool CombatBehavior::backFromBehind(const UnitState& unit, const GameSnapshot& s
             continue;
         }
 
-        if (distance2D(s.player.position, a->position) > kMeleeReach)
+        if (distance2D(s.player.position, a->position) > cfgMeleeReach(ctx))
         {
             continue;
         }
