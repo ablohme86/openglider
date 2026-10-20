@@ -66,7 +66,7 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
     {
         strayClearedAt_ = now;
         ctx.log.info(logcat::Combat, "nothing fighting us, auto-attacking or targeting {} - clearing the target to stop it", target->name);
-        ctx.actions.execute(actions::TargetClear);
+        ctx.clearTarget();
     }
 
     // Remember everything we are fighting.

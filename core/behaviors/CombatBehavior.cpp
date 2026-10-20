@@ -532,8 +532,16 @@ BehaviorStatus CombatBehavior::acquire(const UnitState& unit, const GameSnapshot
     // the nearest attacker hitting us.
     if (const UnitState* t = s.target(); t && t->isAlive() && !s.isAttacker(*t) && t->guid != unit.guid)
     {
-        ctx.log.info(logcat::Target, "clearing stray target {} {} before acquiring attacker {}", t->name, formatGuid(t->guid), unit.name);
-        ctx.actions.execute(actions::TargetClear);
+        const TimePoint now = ctx.now();
+        constexpr Duration kClearThrottle{300};
+
+        if (lastStrayClear_ == TimePoint{} || now - lastStrayClear_ >= kClearThrottle)
+        {
+            lastStrayClear_ = now;
+            ctx.log.info(logcat::Target, "clearing stray target {} {} before acquiring {}", t->name, formatGuid(t->guid), unit.name);
+            ctx.clearTarget();
+        }
+
         return BehaviorStatus::Running;
     }
 
