@@ -22,6 +22,7 @@
 #include "og/navigation/Avoidance.h"
 #include "og/state/IGameStateProvider.h"
 #include "og/actions/ActionBinding.h"
+#include "og/input/Key.h"
 
 #include <algorithm>
 #include <array>
@@ -374,6 +375,40 @@ bool BotContext::clickTarget(const UnitState& unit, MouseButton button)
     actions.mouseMove(screen->x, screen->y);
     actions.click(button);
     log.info(logcat::Target, "clicked {} {} at screen ({}, {})", unit.name, formatGuid(unit.guid), screen->x, screen->y);
+    return true;
+}
+
+void BotContext::clearTarget()
+{
+    actions.execute(actions::TargetClear);
+    dismissGameMenuIfOpen();
+}
+
+bool BotContext::dismissGameMenuIfOpen()
+{
+    if (!uiFrameVisible("GameMenuFrame"))
+    {
+        gameMenuDismissAttempts = 0;
+        return false;
+    }
+
+    const TimePoint nowTime = now();
+    constexpr Duration kThrottle{250};
+    if (lastGameMenuDismissAt != TimePoint{} && nowTime - lastGameMenuDismissAt < kThrottle)
+    {
+        return true;
+    }
+
+    lastGameMenuDismissAt = nowTime;
+    ++gameMenuDismissAttempts;
+    log.info(logcat::Target, "in-game menu is open - pressing Escape to dismiss it (attempt {})", gameMenuDismissAttempts);
+    actions.pressKey(Key::Escape);
+
+    if (gameMenuDismissAttempts >= 3 && clickUiFrame("GameMenuButtonContinue"))
+    {
+        log.info(logcat::Target, "clicked GameMenuButtonContinue to dismiss menu");
+    }
+
     return true;
 }
 

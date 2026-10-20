@@ -466,6 +466,7 @@ private:
     // Taking the target with a click: tried once a mob, before Tab.
     bool clickTried_ = false;
     TimePoint clickSince_{};
+    TimePoint lastStrayClear_{};
     int tabAttempts_ = 0;
     std::optional<TimePoint> lastTab_;
     // Party system: when "/assist <leader>" was last typed, for the leader's target.

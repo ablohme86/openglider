@@ -432,6 +432,13 @@ struct BotContext
     bool setTarget(Guid guid);
     // Clicks on a unit using screen projection (World to Screen) and mouse input.
     bool clickTarget(const UnitState& unit, MouseButton button = MouseButton::Left);
+    // Clears the current target and dismisses the in-game menu if Escape opened it.
+    void clearTarget();
+    // Checks if the in-game menu (GameMenuFrame) is visible and dismisses it with Escape.
+    bool dismissGameMenuIfOpen();
+    TimePoint lastGameMenuDismissAt{};
+    int gameMenuDismissAttempts = 0;
+
     // Whether the client shows the UI frame with this global name; false where
     // its UI cannot be read (see IGameStateProvider::uiFrame).
     bool uiFrameVisible(std::string_view name);

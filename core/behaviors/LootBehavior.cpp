@@ -209,7 +209,7 @@ void LootBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
 
     if (const UnitState* t = s.target(); t && t->isAlive() && !s.isAttacker(*t))
     {
-        ctx.actions.execute(actions::TargetClear);
+        ctx.clearTarget();
     }
 }
 
@@ -348,7 +348,7 @@ std::optional<bool> LootBehavior::targetCorpse(const GameSnapshot& s, const Unit
     // interact with that: it would be attacked.
     if (const UnitState* other = s.target(); other && other->guid != corpse.guid)
     {
-        ctx.actions.execute(actions::TargetClear);
+        ctx.clearTarget();
     }
 
     return std::nullopt;

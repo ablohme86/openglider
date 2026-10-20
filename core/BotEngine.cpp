@@ -251,6 +251,22 @@ void BotEngine::tick(const SnapshotObserver& beforeBehaviors)
 
     ctx_.ships.update(*snapshot);
 
+    // If the in-game menu (GameMenuFrame) is open (e.g. from pressing Escape to
+    // untarget a mob or clear stray targets), dismiss it immediately with Escape.
+    if (ctx_.dismissGameMenuIfOpen())
+    {
+        if (current_)
+        {
+            current_->onExit(ctx_);
+            current_ = nullptr;
+        }
+
+        ctx_.movement.stop();
+        ctx_.actions.releaseAll();
+        last_ = std::move(snapshot);
+        return;
+    }
+
     // Flying a flight path: the game flies the character; nothing is done
     // until it lands.
     if (snapshot->player.isOnTaxi != onTaxi_)

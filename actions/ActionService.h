@@ -59,6 +59,10 @@ public:
     void release(std::string_view action) override;
     bool isHeld(std::string_view action) const override;
     void releaseAll() override;
+    void pressKey(Key key) override
+    {
+        input_.press(key);
+    }
     bool hasBinding(std::string_view action) const override;
     bool chat(std::string_view line) override;
     // The /script lines typed lately (the last within `within` of the one

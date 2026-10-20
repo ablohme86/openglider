@@ -54,6 +54,12 @@ public:
     // `reason` (optional) is logged with the action: why it was chosen.
     virtual ActionResult execute(std::string_view action, std::string_view reason = {}) = 0;
 
+    // Press a physical key directly (e.g. Escape to dismiss in-game UI menus).
+    virtual void pressKey(Key key)
+    {
+        (void)key;
+    }
+
     // Continuous actions (movement): key held until released.
     virtual void hold(std::string_view action) = 0;
     virtual void release(std::string_view action) = 0;
