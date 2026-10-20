@@ -334,6 +334,11 @@ struct BotConfig
     Duration approachTimeout{30000}; // max time to reach pull range
     Duration pullTimeout{15000};     // max time in range without the mob engaging
     Duration blacklistDuration{120000};
+    // Advanced melee / pull tuning
+    float meleeReach = 4.0f;       // kMeleeReach: max distance for melee auto-attack swings
+    float pullOvershoot = 0.90f;   // kPullOvershoot: overshoot multiplier when closing in to pull
+    float chaseMargin = 0.85f;     // kChaseMargin: margin multiplier when chasing an out-of-reach target
+    float pullFloor = 1.5f;        // kPullFloor: closest distance to approach a mob
     // Never go looking for a fight with a mob that gives no experience. Applies
     // to pulls only; the bot always defends itself.
     bool skipGrayMobs = false;

@@ -318,10 +318,11 @@ bool WowMemoryStateProvider::selectLayout()
     {
         chosen = layoutForBuild(version->build);
 
-        // If build 70450: WoW Forever has two client variants: Western (build 70450) and China (virtual build 70451).
+        // If a variant layout exists with build = baseBuild + 1 (e.g. WoW Forever China vs Western):
         // Differentiate by checking which objectManager address contains a valid ObjectManager in memory,
         // completely independent of user locale or game language.
-        if (version->build == 70450 || version->realBuild == 70450)
+        const auto baseBuild = version->realBuild > 0 ? version->realBuild : version->build;
+        if (const ClientLayout* variantLayout = layoutForBuild(baseBuild + 1))
         {
             auto isPtr = [](std::uint64_t p) {
                 return p >= 0x10000 && p < 0x0000'8000'0000'0000ULL;
@@ -341,13 +342,13 @@ bool WowMemoryStateProvider::selectLayout()
                 return isPtr(slots) && count > 0 && count <= layout->modern->maxSlots;
             };
 
-            const ClientLayout* cnLayout = layoutForBuild(70451);
-            const ClientLayout* westLayout = layoutForBuild(70450);
+            const ClientLayout* cnLayout = variantLayout;
+            const ClientLayout* westLayout = chosen ? chosen : layoutForBuild(baseBuild);
 
             if (cnLayout && isValidMgr(cnLayout))
             {
                 chosen = cnLayout;
-                log_.info(logcat::Game, "detected WoW Forever CN (build 70450 China client, layout 70451)");
+                log_.info(logcat::Game, "detected variant client layout {} (virtual build {})", cnLayout->name, cnLayout->build);
             }
             else if (westLayout && isValidMgr(westLayout))
             {
@@ -3488,6 +3489,16 @@ std::optional<std::string> WowMemoryStateProvider::uiText(std::string_view frame
     }
 
     return modern_->uiText(frame, fontString);
+}
+
+std::optional<std::uint32_t> WowMemoryStateProvider::uiTextColor(std::string_view frame, std::string_view fontString)
+{
+    if (!modern_ || !memory_->attached())
+    {
+        return std::nullopt;
+    }
+
+    return modern_->uiTextColor(frame, fontString);
 }
 
 std::vector<UiFrame> WowMemoryStateProvider::uiFramesWithText(std::string_view under, std::string_view text)
