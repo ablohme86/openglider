@@ -35,6 +35,8 @@ struct ClientVersion
     int minor = 0;
     int patch = 0;
     std::uint32_t build = 0;
+    bool isChina = false;
+    std::uint32_t realBuild = 0;
 
     std::string toString() const;
 };

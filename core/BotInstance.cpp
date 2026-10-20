@@ -653,7 +653,7 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
 
         if (std::find(context_.strongMobs.spotted().begin(), context_.strongMobs.spotted().end(), mob.guid) != context_.strongMobs.spotted().end())
         {
-            log_.info(logcat::Target, "keeping clear of {} (level {}, {:.0f} yd off): too strong to fight, it notices us from {:.0f} yd", mob.name, mob.level > 0 ? std::to_string(mob.level) : std::string("??"), mob.distance, mob.aggroRange);
+            log_.info(logcat::Target, "keeping clear of {} (level {}, {:.0f} yd off): it notices us from {:.0f} yd", mob.name, mob.level > 0 ? std::to_string(mob.level) : std::string("??"), mob.distance, mob.aggroRange);
         }
     }
 

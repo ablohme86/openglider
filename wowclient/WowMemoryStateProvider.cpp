@@ -309,7 +309,7 @@ bool WowMemoryStateProvider::selectLayout()
             return false;
         }
 
-        if (version && version->build != chosen->build)
+        if (version && version->build != chosen->build && version->realBuild != chosen->build)
         {
             log_.warn(logcat::Game, "client is set to {} but WoW.exe reports {} - using the {} layout anyway", chosen->name, version->toString(), chosen->name);
         }
@@ -317,6 +317,47 @@ bool WowMemoryStateProvider::selectLayout()
     else if (version)
     {
         chosen = layoutForBuild(version->build);
+
+        // If build 70450: WoW Forever has two client variants: Western (build 70450) and China (virtual build 70451).
+        // Differentiate by checking which objectManager address contains a valid ObjectManager in memory,
+        // completely independent of user locale or game language.
+        if (version->build == 70450 || version->realBuild == 70450)
+        {
+            auto isPtr = [](std::uint64_t p) {
+                return p >= 0x10000 && p < 0x0000'8000'0000'0000ULL;
+            };
+            auto isValidMgr = [&](const ClientLayout* layout) -> bool {
+                if (!layout || !layout->modern || !memory_)
+                {
+                    return false;
+                }
+                const auto primary = memory_->read<std::uint64_t>(imageBase_ + layout->modern->objectManager).value_or(0);
+                if (!isPtr(primary))
+                {
+                    return false;
+                }
+                const auto slots = memory_->read<std::uint64_t>(primary + layout->modern->mgrSlots).value_or(0);
+                const auto count = memory_->read<std::uint32_t>(primary + layout->modern->mgrSlotCount).value_or(0);
+                return isPtr(slots) && count > 0 && count <= layout->modern->maxSlots;
+            };
+
+            const ClientLayout* cnLayout = layoutForBuild(70451);
+            const ClientLayout* westLayout = layoutForBuild(70450);
+
+            if (cnLayout && isValidMgr(cnLayout))
+            {
+                chosen = cnLayout;
+                log_.info(logcat::Game, "detected WoW Forever CN (build 70450 China client, layout 70451)");
+            }
+            else if (westLayout && isValidMgr(westLayout))
+            {
+                chosen = westLayout;
+            }
+            else if (cnLayout && !westLayout)
+            {
+                chosen = cnLayout;
+            }
+        }
 
         if (!chosen)
         {
@@ -1306,7 +1347,7 @@ std::optional<GameSnapshot> WowMemoryStateProvider::capture()
 
     for (auto& u : s.units)
     {
-        if (u.inCombat && u.targetGuid == localGuid)
+        if (!u.isPlayer && u.inCombat && u.targetGuid == localGuid)
         {
             u.reaction = Reaction::Hostile;
         }

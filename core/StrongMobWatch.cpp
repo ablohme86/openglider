@@ -128,7 +128,7 @@ void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now, 
         {
             continue;
         }
-        mobs_.push_back({u.guid, u.name, u.level, u.position, track.velocity, aggroRange(level, p.level, aggroBase), ours, distance2D(p.position, u.position)});
+        mobs_.push_back({u.guid, u.name, u.level, u.position, track.velocity, aggroRange(level, p.level, aggroBase), ours, distance(p.position, u.position)});
     }
 
     std::erase_if(tracks_, [&](const auto& t) { return now - t.second.seenAt > kForget; });
@@ -188,9 +188,19 @@ const StrongMob* StrongMobWatch::threatTo(const Vec3& point, float margin, Guid 
             continue;
         }
 
-        const float d = distance2D(point, nearestOnWay(mob, point));
+        const float radius = mob.aggroRange + margin;
+        const Vec3 onWay = nearestOnWay(mob, point);
 
-        if (d <= mob.aggroRange + margin && (!nearest || d < best))
+        // A mob too far above or below is on another level (e.g. in a mine or
+        // cave under the ground) and will not aggro.
+        if (std::fabs(point.z - onWay.z) > AvoidZone::reachOf(radius))
+        {
+            continue;
+        }
+
+        const float d = distance2D(point, onWay);
+
+        if (d <= radius && (!nearest || d < best))
         {
             nearest = &mob;
             best = d;

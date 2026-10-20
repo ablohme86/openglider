@@ -173,7 +173,7 @@ std::optional<AvoidZone> BotContext::dangerAt(const Vec3& point) const
 {
     for (const AvoidZone& z : packZones)
     {
-        if (!z.ignored && distance2D(point, z.center) <= z.radius)
+        if (!z.ignored && !z.apart(point.z, point.z) && distance2D(point, z.center) <= z.radius)
         {
             return z;
         }
@@ -183,7 +183,7 @@ std::optional<AvoidZone> BotContext::dangerAt(const Vec3& point) const
     {
         for (const AvoidZone& z : strongMobs.zones(0.0f, combat.engaged))
         {
-            if (distance2D(point, z.center) <= z.radius)
+            if (!z.apart(point.z, point.z) && distance2D(point, z.center) <= z.radius)
             {
                 return z;
             }

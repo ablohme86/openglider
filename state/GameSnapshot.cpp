@@ -549,6 +549,12 @@ bool GameSnapshot::isAttacker(const UnitState& u) const
         return false;
     }
 
+    // A non-hostile player targeting us while in combat (e.g. fighting near us) is not an attacker.
+    if (u.isPlayer && u.reaction != Reaction::Hostile)
+    {
+        return false;
+    }
+
     if (u.targetGuid == player.guid)
     {
         return true;

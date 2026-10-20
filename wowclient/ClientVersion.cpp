@@ -31,7 +31,7 @@ namespace og::wowclient
 
 std::string ClientVersion::toString() const
 {
-    return std::format("{}.{}.{}.{}", major, minor, patch, build);
+    return std::format("{}.{}.{}.{}", major, minor, patch, realBuild > 0 ? realBuild : build);
 }
 
 std::uint64_t findImageBase(const IProcessMemory& memory)
@@ -117,12 +117,16 @@ std::optional<ClientVersion> readClientVersion(const IProcessMemory& memory, std
             // The 64-bit Classic clients spread their digits over the 16-bit
             // fields, because a five-digit build does not fit one: 2.5.6.69795
             // is stored as 205.6.6979.5.
+            const std::uint32_t rawBuild = (major >= 100)
+                ? static_cast<std::uint32_t>((ls >> 16) * 10 + (ls & 0xFFFF))
+                : static_cast<std::uint32_t>(ls & 0xFFFF);
+
             if (major >= 100)
             {
-                return ClientVersion{major / 100, major % 100, static_cast<int>(ms & 0xFFFF), (ls >> 16) * 10 + (ls & 0xFFFF)};
+                return ClientVersion{major / 100, major % 100, static_cast<int>(ms & 0xFFFF), rawBuild, false, rawBuild};
             }
 
-            return ClientVersion{major, static_cast<int>(ms & 0xFFFF), static_cast<int>(ls >> 16), ls & 0xFFFF};
+            return ClientVersion{major, static_cast<int>(ms & 0xFFFF), static_cast<int>(ls >> 16), rawBuild, false, rawBuild};
         }
 
         return std::nullopt;

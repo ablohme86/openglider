@@ -2390,7 +2390,7 @@ std::optional<GameSnapshot> ModernClientReader::capture(TimePoint now, float vis
 
     for (auto& u : s.units)
     {
-        if (u.inCombat && u.targetGuid == s.player.guid)
+        if (!u.isPlayer && u.inCombat && u.targetGuid == s.player.guid)
         {
             u.reaction = Reaction::Hostile;
         }
