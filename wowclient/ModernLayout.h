@@ -157,6 +157,9 @@ struct ModernLayout
     // after it; bit (id - 1) is TaxiNodes id's. Set without the flight map
     // open. 0: not known.
     std::uint32_t playerKnownTaxiNodes = 0;
+    // When true, the known taxi nodes bit array is embedded directly on the player object
+    // at playerKnownTaxiNodes (e.g. Classic Era 1.15.9), rather than being a pointer + length.
+    bool playerKnownTaxiNodesInline = false;
     int inventoryBagFirst = 0; // the equipped bags
     int inventoryBagCount = 0;
     int inventoryBackpackFirst = 0;
@@ -225,6 +228,9 @@ struct ModernLayout
     std::uint32_t uiRegionLink = 0;
     std::uint32_t uiFontStringText = 0;
     std::uint32_t uiFontStringColor = 0; // packed ARGB
+    // When true, buttons / frames expose their text via a direct FontString pointer
+    // on the frame at uiFrameRegions / +0x1A8 rather than a circular regions ring.
+    bool uiDirectFontString = false;
     std::uint32_t uiObjectParent = 0;
     std::uint32_t uiTooltipOwner = 0;
     std::uint64_t uiBagButtonVtable = 0; // RVA of ordinary bag item buttons

@@ -320,6 +320,7 @@ struct BotConfig
     bool usePathfinding = false;
     // Pathfinder: long ways keep to the roads.
     bool useRoads = true;
+    int useRoadsThresholdYards = 250;
     float pathfindingRoamRadius = 100.0f;
     float waypointRadius = 3.0f;
     // Remember the way round an obstacle the bot works itself free of, so the

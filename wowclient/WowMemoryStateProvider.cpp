@@ -309,7 +309,7 @@ bool WowMemoryStateProvider::selectLayout()
             return false;
         }
 
-        if (version && version->build != chosen->build)
+        if (version && version->build != chosen->build && version->realBuild != chosen->build)
         {
             log_.warn(logcat::Game, "client is set to {} but WoW.exe reports {} - using the {} layout anyway", chosen->name, version->toString(), chosen->name);
         }
@@ -317,6 +317,55 @@ bool WowMemoryStateProvider::selectLayout()
     else if (version)
     {
         chosen = layoutForBuild(version->build);
+
+        // If build 70450: WoW Forever has two client variants: Western (build 70450) and China (virtual build 70451).
+        // Differentiate by checking which objectManager address contains a valid ObjectManager in memory,
+        // completely independent of user locale or game language.
+        if (version->build == 70450 || version->realBuild == 70450)
+        {
+            auto isPtr = [](std::uint64_t p) {
+                return p >= 0x10000 && p < 0x0000'8000'0000'0000ULL;
+            };
+            auto isValidMgr = [&](const ClientLayout* layout) -> bool {
+                if (!layout || !layout->modern || !memory_)
+                {
+                    return false;
+                }
+                const auto primary = memory_->read<std::uint64_t>(imageBase_ + layout->modern->objectManager).value_or(0);
+                if (!isPtr(primary))
+                {
+                    return false;
+                }
+                const auto slots = memory_->read<std::uint64_t>(primary + layout->modern->mgrSlots).value_or(0);
+                const auto count = memory_->read<std::uint32_t>(primary + layout->modern->mgrSlotCount).value_or(0);
+                return isPtr(slots) && count > 0 && count <= layout->modern->maxSlots;
+            };
+
+            const ClientLayout* cnLayout = layoutForBuild(70451);
+            const ClientLayout* westLayout = layoutForBuild(70450);
+
+            if (cnLayout && isValidMgr(cnLayout))
+            {
+                chosen = cnLayout;
+                log_.info(logcat::Game, "detected WoW Forever CN (build 70450 China client, layout 70451)");
+            }
+            else if (westLayout && isValidMgr(westLayout))
+            {
+                chosen = westLayout;
+            }
+            else if (cnLayout && !westLayout)
+            {
+                chosen = cnLayout;
+            }
+            else if (westLayout && !cnLayout)
+            {
+                chosen = westLayout;
+            }
+            else
+            {
+                chosen = nullptr;
+            }
+        }
 
         if (!chosen)
         {
@@ -1306,7 +1355,7 @@ std::optional<GameSnapshot> WowMemoryStateProvider::capture()
 
     for (auto& u : s.units)
     {
-        if (u.inCombat && u.targetGuid == localGuid)
+        if (!u.isPlayer && u.inCombat && u.targetGuid == localGuid)
         {
             u.reaction = Reaction::Hostile;
         }
@@ -2443,9 +2492,9 @@ std::optional<UiItemTooltip> WowMemoryStateProvider::tooltipOver(const UiFrame& 
         return std::nullopt;
     }
 
-    constexpr auto kPoll = std::chrono::milliseconds(50);
-    constexpr int kPolls = 24;
-    constexpr int kOwnAfter = 12; // the mouse was on this button already
+    constexpr auto kPoll = std::chrono::milliseconds(25);
+    constexpr int kPolls = 6;
+    constexpr int kOwnAfter = 2; // the mouse was on this button already
     std::optional<UiItemTooltip> seen;
 
     for (int poll = 0; poll < kPolls; ++poll)
@@ -2478,6 +2527,15 @@ int WowMemoryStateProvider::readSpellDataFromTooltips(ActionMap& actionMap, cons
     if (!hover || !supportsUi() || !supportsUiBagSlots() || !capture())
     {
         return 0;
+    }
+
+    std::string classPrefix;
+    if (modern_)
+    {
+        if (auto snapshot = modern_->capture(clock_.now(), config_.visibilityRange))
+        {
+            classPrefix = std::string(toString(snapshot->player.playerClass));
+        }
     }
 
     std::set<std::uint32_t> looked;
@@ -2518,13 +2576,27 @@ int WowMemoryStateProvider::readSpellDataFromTooltips(ActionMap& actionMap, cons
 
         const SpellTooltipData data = parseSpellTooltip(tooltip->lines);
 
-        if (!data.castTime && !data.range)
+        if (!data.castTime && !data.range && !data.cooldown)
         {
             continue;
         }
 
         tooltipSpellData_[slot.id] = data;
-        log_.debug(logcat::Action, "read from its tooltip: {} casts in {}, range {}", tooltip->name, data.castTime ? std::format("{:.1f}s", toSeconds(*data.castTime)) : "?", data.range ? std::format("{:.0f}-{:.0f} yd", data.range->min, data.range->max) : "?");
+
+        const std::string rawActionName = SpellNames::actionName(tooltip->name.empty() ? name : tooltip->name);
+        const std::string actionName = (!classPrefix.empty() && classPrefix != "Unknown") ? classPrefix + "." + rawActionName : rawActionName;
+
+        Duration actionCd = data.cooldown.value_or(Duration(0));
+        if (actionCd == Duration(0))
+        {
+            if (const ActionBinding* existing = actionMap.find(actionName))
+            {
+                actionCd = existing->cooldown;
+            }
+        }
+        const Duration actionCast = data.castTime.value_or(Duration(0));
+
+        log_.info(logcat::Action, "Loaded action {} data (cooldown: {:.1f}s, cast: {:.1f}s)", actionName, toSeconds(actionCd), toSeconds(actionCast));
     }
 
     if (tooltipSpellData_.empty())
@@ -2981,6 +3053,10 @@ void WowMemoryStateProvider::autoDetectActionBindings(ActionMap& actionMap, bool
         // What the spell's tooltip said goes before both: it has the talents in.
         if (const auto told = tooltipSpellData_.find(slot.id); told != tooltipSpellData_.end())
         {
+            if (told->second.cooldown)
+            {
+                cd = *told->second.cooldown;
+            }
             castTime = told->second.castTime.value_or(castTime);
             range = told->second.range.value_or(range);
         }
@@ -2997,7 +3073,7 @@ void WowMemoryStateProvider::autoDetectActionBindings(ActionMap& actionMap, bool
 
             if (changed)
             {
-                log_.info(logcat::Action, "Auto-detected action: {} -> {} (cooldown: {:.1f}s, cast: {:.1f}s)", prefixed, where, toSeconds(cd), toSeconds(castTime));
+                log_.info(logcat::Action, "Auto-detected action: {} -> {}", prefixed, where);
             }
         }
 

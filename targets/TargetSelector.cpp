@@ -356,6 +356,11 @@ std::optional<std::string> TargetSelector::rejectReason(const UnitState& u, cons
     // is fought where it stands.
     for (const DangerZone& zone : dangerZones_)
     {
+        if (std::fabs(u.position.z - zone.center.z) > AvoidZone::reachOf(zone.radius))
+        {
+            continue;
+        }
+
         if (distance2D(u.position, zone.center) <= zone.radius)
         {
             return zone.respawn ? std::format("where {} comes back at once", zone.name) : zone.pack ? std::format("within reach of a pack ({})", zone.name) : std::format("within reach of {}, too strong to fight", zone.name);

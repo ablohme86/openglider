@@ -73,6 +73,11 @@ public:
     {
     }
 
+    // A destination farther than this prefers roads over direct ground.
+    virtual void setRoadThreshold(float)
+    {
+    }
+
     // Water deep enough to swim is crossed only where there is no bridge or
     // way round near (on); a ghost walks on it, and goes straight (off).
     virtual void setAvoidWater(bool)

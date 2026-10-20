@@ -59,6 +59,33 @@ std::optional<double> leadingNumber(std::string_view& text)
     return value;
 }
 
+std::optional<Duration> cooldownOf(std::string_view line)
+{
+    if (!line.ends_with(" cooldown") && !line.ends_with(" cd"))
+    {
+        return std::nullopt;
+    }
+
+    const auto amount = leadingNumber(line);
+
+    if (!amount || *amount < 0.0)
+    {
+        return std::nullopt;
+    }
+
+    if (line == " sec cooldown" || line == " sec cd")
+    {
+        return seconds(*amount);
+    }
+
+    if (line == " min cooldown" || line == " min cd")
+    {
+        return seconds(*amount * 60.0);
+    }
+
+    return std::nullopt;
+}
+
 std::optional<Duration> castTimeOf(std::string_view line)
 {
     if (line == "Instant" || line == "Instant cast")
@@ -142,6 +169,11 @@ SpellTooltipData parseSpellTooltip(std::span<const std::string> lines)
     for (const std::string& raw : lines)
     {
         const std::string_view line = trimmed(raw);
+
+        if (!data.cooldown)
+        {
+            data.cooldown = cooldownOf(line);
+        }
 
         if (!data.castTime)
         {

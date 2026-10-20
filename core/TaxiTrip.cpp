@@ -19,9 +19,11 @@
 #include "og/core/BotContext.h"
 
 #include <algorithm>
-#include <initializer_list>
 #include <cmath>
 #include <format>
+#include <initializer_list>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace og
 {
@@ -176,53 +178,73 @@ std::optional<int> taxiButtonFor(std::uint32_t target, std::uint32_t mapId, cons
         return std::nullopt;
     }
 
-    // The origin flight master's button cannot be the destination.
-    std::optional<int> fromButton;
-    if (from)
+    std::vector<std::uint32_t> candidates = known;
+    if (std::find(candidates.begin(), candidates.end(), target) == candidates.end())
     {
-        if (const auto* current = network.node(*from); current && current->mapId == mapId)
+        candidates.push_back(target);
+    }
+    if (from && std::find(candidates.begin(), candidates.end(), *from) == candidates.end())
+    {
+        candidates.push_back(*from);
+    }
+
+    struct Edge
+    {
+        float dist;
+        int buttonIndex;
+        std::uint32_t nodeId;
+    };
+    std::vector<Edge> edges;
+
+    constexpr float kMaxApart = 0.14f;
+
+    for (const auto& [bIdx, bFrame] : buttons)
+    {
+        const auto bPos = onMap(bFrame);
+        for (const auto id : candidates)
         {
-            const auto it = std::min_element(buttons.begin(), buttons.end(), [&](const auto& a, const auto& b) {
-                return apart(onMap(a.second), placed(*current)) < apart(onMap(b.second), placed(*current));
-            });
-            if (it != buttons.end() && apart(onMap(it->second), placed(*current)) < 0.08f)
+            if (const auto* n = network.node(id); n && n->mapId == mapId)
             {
-                fromButton = it->first;
+                const float d = apart(bPos, placed(*n));
+                if (d < kMaxApart)
+                {
+                    edges.push_back({d, bIdx, id});
+                }
             }
         }
     }
 
-    std::vector<std::pair<int, UiFrame>> candidates;
-    for (const auto& b : buttons)
-    {
-        if (!fromButton || b.first != *fromButton)
-        {
-            candidates.push_back(b);
-        }
-    }
-
-    if (candidates.empty())
-    {
-        return std::nullopt;
-    }
-
-    // The button nearest where the flight point is...
-    const auto nearest = std::min_element(candidates.begin(), candidates.end(), [&](const auto& a, const auto& b) {
-        return apart(onMap(a.second), placed(*wanted)) < apart(onMap(b.second), placed(*wanted));
+    std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+        return a.dist < b.dist;
     });
 
-    // ...is it, if no other flight point learnt is nearer that button.
-    for (const auto id : known)
-    {
-        const auto* other = network.node(id);
+    std::unordered_set<int> matchedButtons;
+    std::unordered_set<std::uint32_t> matchedNodes;
+    std::unordered_map<std::uint32_t, int> nodeToButton;
 
-        if (other && other->mapId == mapId && id != target && (!from || id != *from) && apart(onMap(nearest->second), placed(*other)) < apart(onMap(nearest->second), placed(*wanted)))
+    for (const auto& e : edges)
+    {
+        if (!matchedButtons.contains(e.buttonIndex) && !matchedNodes.contains(e.nodeId))
         {
-            return std::nullopt;
+            matchedButtons.insert(e.buttonIndex);
+            matchedNodes.insert(e.nodeId);
+            nodeToButton[e.nodeId] = e.buttonIndex;
         }
     }
 
-    return apart(onMap(nearest->second), placed(*wanted)) < 0.08f ? std::optional<int>{nearest->first} : std::nullopt;
+    if (const auto it = nodeToButton.find(target); it != nodeToButton.end())
+    {
+        if (from)
+        {
+            if (const auto fromIt = nodeToButton.find(*from); fromIt != nodeToButton.end() && fromIt->second == it->second)
+            {
+                return std::nullopt;
+            }
+        }
+        return it->second;
+    }
+
+    return std::nullopt;
 }
 
 TaxiTrip::Status TaxiTrip::fail(BotContext& ctx, std::string why)
