@@ -123,10 +123,10 @@ std::optional<ClientVersion> readClientVersion(const IProcessMemory& memory, std
 
             if (major >= 100)
             {
-                return ClientVersion{major / 100, major % 100, static_cast<int>(ms & 0xFFFF), rawBuild, false, rawBuild};
+                return ClientVersion{major / 100, major % 100, static_cast<int>(ms & 0xFFFF), rawBuild, rawBuild};
             }
 
-            return ClientVersion{major, static_cast<int>(ms & 0xFFFF), static_cast<int>(ls >> 16), rawBuild, false, rawBuild};
+            return ClientVersion{major, static_cast<int>(ms & 0xFFFF), static_cast<int>(ls >> 16), rawBuild, rawBuild};
         }
 
         return std::nullopt;

@@ -560,7 +560,7 @@ const UnitState* TargetSelector::selectAttacker(const GameSnapshot& s) const
 
     for (const UnitState* u : s.attackers())
     {
-        if (blacklist_.contains(u->guid) || (u->isPlayer && !config_.attackPlayers))
+        if (blacklist_.contains(u->guid))
         {
             continue;
         }

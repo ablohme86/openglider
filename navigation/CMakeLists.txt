@@ -20,7 +20,7 @@ og_add_module(navigation
         og_actions)
 if(OG_WITH_PATHFINDING)
     target_sources(og_navigation PRIVATE ClientNavigationProvider.cpp ClientMapSource.cpp)
-    target_link_libraries(og_navigation PRIVATE Recast Detour)
+    target_link_libraries(og_navigation PUBLIC Recast Detour)
     target_compile_definitions(og_navigation PUBLIC OG_HAS_CLIENT_PATHFINDING=1)
     if(OG_HAVE_CASCLIB)
         target_link_libraries(og_navigation PRIVATE og_minimap)

@@ -357,6 +357,14 @@ bool WowMemoryStateProvider::selectLayout()
             {
                 chosen = cnLayout;
             }
+            else if (westLayout && !cnLayout)
+            {
+                chosen = westLayout;
+            }
+            else
+            {
+                chosen = nullptr;
+            }
         }
 
         if (!chosen)

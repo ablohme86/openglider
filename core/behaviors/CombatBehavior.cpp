@@ -292,7 +292,7 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
     {
         // One fighting us, not running from us: while the target flees, a mob
         // hitting us is fought rather than the runner chased.
-        const auto fighting = [&](const UnitState* u) { return u && u->isAlive() && s.isAttacker(*u) && !u->isFleeing && (!u->isPlayer || ctx.targets.config().attackPlayers); };
+        const auto fighting = [&](const UnitState* u) { return u && u->isAlive() && s.isAttacker(*u) && !u->isFleeing; };
 
         // The one that fled is back: finished first, then the rest.
         if (const UnitState* back = s.findUnit(fled_); fighting(back))
@@ -325,7 +325,7 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
         }
 
         // Only the runner: after it.
-        if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t) && (!t->isPlayer || ctx.targets.config().attackPlayers))
+        if (const UnitState* t = s.target(); t && t->isAlive() && s.isAttacker(*t))
         {
             return t->guid;
         }
@@ -336,20 +336,14 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
         }
     }
 
-    if (const UnitState* e = s.findUnit(ctx.combat.engaged); e && e->isAlive() && e->reaction != Reaction::Friendly && (!e->isPlayer || ctx.targets.config().attackPlayers))
+    if (const UnitState* e = s.findUnit(ctx.combat.engaged); e && e->isAlive() && e->reaction != Reaction::Friendly)
     {
         return e->guid;
     }
 
     if (!attackers.empty())
     {
-        for (const UnitState* u : attackers)
-        {
-            if (!u->isPlayer || ctx.targets.config().attackPlayers)
-            {
-                return u->guid;
-            }
-        }
+        return attackers.front()->guid;
     }
 
     return 0;
