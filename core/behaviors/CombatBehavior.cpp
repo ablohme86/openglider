@@ -61,8 +61,8 @@ constexpr float kChaseMargin = 0.85f;
 
 inline float cfgPullFloor(const BotContext& ctx) { return ctx.config.pullFloor > 0.0f ? ctx.config.pullFloor : kPullFloor; }
 inline float cfgMeleeReach(const BotContext& ctx) { return ctx.config.meleeReach > 0.0f ? ctx.config.meleeReach : kMeleeReach; }
-inline float cfgPullOvershoot(const BotContext& ctx) { return ctx.config.pullOvershoot > 0.0f ? ctx.config.pullOvershoot : kPullOvershoot; }
-inline float cfgChaseMargin(const BotContext& ctx) { return ctx.config.chaseMargin > 0.0f ? ctx.config.chaseMargin : kChaseMargin; }
+inline float cfgPullOvershoot(const BotContext& ctx) { return (ctx.config.pullOvershoot > 0.0f && ctx.config.pullOvershoot < 1.0f) ? ctx.config.pullOvershoot : kPullOvershoot; }
+inline float cfgChaseMargin(const BotContext& ctx) { return (ctx.config.chaseMargin > 0.0f && ctx.config.chaseMargin < 1.0f) ? ctx.config.chaseMargin : kChaseMargin; }
 
 // A pull that has not drawn the mob by now did not go off: a shot or spell
 // lands well within this, and a mob it hit is in combat at once.
