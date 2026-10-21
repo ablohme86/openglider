@@ -637,14 +637,19 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
     {
         for (const QuestTarget& quest : context_.questTargets)
         {
-            if (!quest.done)
+            if (!quest.done && isLowestLevelQuest(quest, context_.questTargets))
             {
                 questMobs.insert(questMobs.end(), quest.mobs.begin(), quest.mobs.end());
             }
         }
     }
 
-    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase, questMobs);
+    const auto questMobCanBePulled = [&](const UnitState& unit)
+    {
+        return std::find(questMobs.begin(), questMobs.end(), unit.entry) != questMobs.end() && !targets_.rejectReason(unit, s);
+    };
+    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(),
+                               config_.aggroRadiusBase, questMobs, questMobCanBePulled);
 
     context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 

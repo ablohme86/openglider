@@ -414,6 +414,7 @@ public:
 
 private:
     Guid chooseTarget(const GameSnapshot& s, BotContext& ctx) const;
+    void forgetFled(BotContext& ctx);
     BehaviorStatus acquire(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
     BehaviorStatus pull(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
     BehaviorStatus fight(const UnitState& unit, const GameSnapshot& s, BotContext& ctx);
@@ -431,9 +432,11 @@ private:
     bool pullFinished_ = false;
     bool pullActionExecuted_ = false;
     TimePoint pullActionAt_{}; // when the last pull rule went off
-    // The target that fled, until it is dead or gone: fought first again
-    // once it is back, before the mob fought meanwhile.
+    // The target that fled, fought first again once it returns before the
+    // mob fought meanwhile, until it dies, leaves sight or the fight is dropped.
     Guid fled_ = 0;
+    std::optional<TargetBlacklist::Entry> fledBlacklistAtStart_;
+    std::optional<TimePoint> fledCombatLostAt_;
     Guid tappedGuid_ = 0;      // the target seen tagged by another player, since
     TimePoint tappedSince_{};
     std::optional<TimePoint> autoRepeatStartedAt_;

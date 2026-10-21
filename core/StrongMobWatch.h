@@ -23,6 +23,7 @@
 #include "og/navigation/ObstacleMemory.h"
 #include "og/state/GameSnapshot.h"
 
+#include <functional>
 #include <map>
 #include <span>
 #include <string>
@@ -64,8 +65,9 @@ public:
     // level above.
     static float aggroRange(int mobLevel, int playerLevel, float base = 20.0f);
 
-    // Quest objectives are exempt from this grinding-level cap.
-    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now, float aggroBase = 20.0f, std::span<const std::uint32_t> questMobs = {});
+    // Pullable quest objectives are exempt from this grinding-level cap.
+    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now, float aggroBase = 20.0f,
+                std::span<const std::uint32_t> questMobs = {}, const std::function<bool(const UnitState&)>& questMobCanBePulled = {});
     const std::vector<StrongMob>& mobs() const
     {
         return mobs_;
