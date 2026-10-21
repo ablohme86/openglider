@@ -386,7 +386,7 @@ void BotContext::clearTarget()
 
 bool BotContext::dismissGameMenuIfOpen()
 {
-    if (!uiFrameVisible("GameMenuFrame"))
+    if (!controlsClient || !uiFrameVisible("GameMenuFrame"))
     {
         gameMenuDismissAttempts = 0;
         return false;

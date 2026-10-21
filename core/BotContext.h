@@ -435,7 +435,12 @@ struct BotContext
     // Clears the current target and dismisses the in-game menu if Escape opened it.
     void clearTarget();
     // Checks if the in-game menu (GameMenuFrame) is visible and dismisses it with Escape.
+    // Only while the bot drives the client (see controlsClient): a paused bot
+    // leaves the game menu - and the player's Escape - alone.
     bool dismissGameMenuIfOpen();
+    // The bot drives the client this tick: running, or on a Go To while
+    // paused. Set by BotEngine::tick before anything else looks at it.
+    bool controlsClient = true;
     TimePoint lastGameMenuDismissAt{};
     int gameMenuDismissAttempts = 0;
 

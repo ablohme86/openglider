@@ -62,7 +62,7 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
     {
         strayAttackSince_ = now;
     }
-    else if (now - *strayAttackSince_ >= kStrayAttackWait && now - strayClearedAt_ >= kStrayClearEvery)
+    else if (ctx.controlsClient && now - *strayAttackSince_ >= kStrayAttackWait && now - strayClearedAt_ >= kStrayClearEvery)
     {
         strayClearedAt_ = now;
         ctx.log.info(logcat::Combat, "nothing fighting us, auto-attacking or targeting {} - clearing the target to stop it", target->name);
