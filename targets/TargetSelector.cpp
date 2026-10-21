@@ -37,6 +37,13 @@ bool iequals(const std::string& a, const std::string& b)
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) { return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y)); });
 }
 
+bool outsideLevelRange(const UnitState& unit, const TargetFilterConfig& config, bool questMob)
+{
+    // A quest mob remains a valid objective even when the global/profile
+    // grinding range was set for a different character or route.
+    return !questMob && (unit.level < config.minLevel || unit.level > config.maxLevel);
+}
+
 } // namespace
 
 TargetSelector::TargetSelector(TargetFilterConfig config, TargetBlacklist& blacklist) : config_(std::move(config)), blacklist_(blacklist)
@@ -87,7 +94,7 @@ const UnitState* TargetSelector::threatInTheWay(const GameSnapshot& s, std::opti
 
         const bool questMob = std::find(questMobs_.begin(), questMobs_.end(), u.entry) != questMobs_.end();
 
-        if (u.level < config_.minLevel || u.level > config_.maxLevel || (isElite(u) && !config_.attackElites && (!questMob || u.level > s.player.level + 1)))
+        if (outsideLevelRange(u, config_, questMob) || (isElite(u) && !config_.attackElites && (!questMob || u.level > s.player.level + 1)))
         {
             continue;
         }
@@ -213,7 +220,7 @@ const UnitState* TargetSelector::standingInTheWay(const GameSnapshot& s, const U
 
         const bool questMob = std::find(questMobs_.begin(), questMobs_.end(), u.entry) != questMobs_.end();
 
-        if (u.level < config_.minLevel || u.level > config_.maxLevel || (isElite(u) && !config_.attackElites && (!questMob || u.level > s.player.level + 1)))
+        if (outsideLevelRange(u, config_, questMob) || (isElite(u) && !config_.attackElites && (!questMob || u.level > s.player.level + 1)))
         {
             continue;
         }
@@ -334,7 +341,7 @@ std::optional<std::string> TargetSelector::rejectReason(const UnitState& u, cons
         return "neutral";
     }
 
-    if (u.level < config_.minLevel || u.level > config_.maxLevel)
+    if (outsideLevelRange(u, config_, questMob))
     {
         return std::format("level {} outside {}-{}", u.level, config_.minLevel, config_.maxLevel);
     }

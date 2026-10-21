@@ -33,11 +33,11 @@ namespace
 // The bags shown after /run ToggleAllBags(), at the latest.
 const Duration kBagsOpen{3000};
 // A tooltip, and the comparison beside it, a moment after the mouse arrives.
-const Duration kTooltip{400};
+const Duration kTooltip{15};
 // No tooltip for a slot by then: an empty one.
-const Duration kNoTooltip{1500};
+const Duration kNoTooltip{15};
 // The right-click shown in the bags (or the bind question), at the latest.
-const Duration kEquipAnswer{2500};
+const Duration kEquipAnswer{1500};
 
 int countOf(const GameSnapshot& s, std::uint32_t item)
 {
@@ -136,6 +136,8 @@ void AutoEquipBehavior::onEnter(const GameSnapshot&, BotContext& ctx)
 {
     step_ = Step::OpenBags;
     stepAt_ = ctx.now();
+    bagSlots_.clear();
+    scannedItems_.clear();
     looked_.clear();
     slot_.reset();
     ctx.navigator.stop();
@@ -150,6 +152,8 @@ void AutoEquipBehavior::onExit(BotContext& ctx)
         bagsOpened_ = false;
     }
 
+    bagSlots_.clear();
+    scannedItems_.clear();
     looked_.clear();
     slot_.reset();
 }
@@ -161,7 +165,6 @@ BehaviorStatus AutoEquipBehavior::next(BotContext& ctx)
         pending_.erase(pending_.begin());
     }
 
-    looked_.clear();
     slot_.reset();
     stepAt_ = ctx.now();
     step_ = pending_.empty() ? Step::Close : Step::Find;
@@ -199,8 +202,11 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             compareSet_ = true;
         }
 
-        if (!ctx.provider->uiBagSlots().empty())
+        const auto slots = ctx.provider->uiBagSlots();
+
+        if (!slots.empty())
         {
+            bagSlots_ = slots;
             step_ = Step::Find;
             stepAt_ = now;
             return BehaviorStatus::Running;
@@ -238,19 +244,43 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return BehaviorStatus::Running;
         }
 
-        const auto slots = ctx.provider->uiBagSlots();
-
-        if (slots.empty())
+        if (countOf(s, pending_.front().itemId) == 0)
         {
+            return next(ctx);
+        }
+
+        if (bagSlots_.empty())
+        {
+            bagSlots_ = ctx.provider->uiBagSlots();
+
+            if (!bagSlots_.empty())
+            {
+                stepAt_ = now;
+                return BehaviorStatus::Running;
+            }
+
             step_ = Step::OpenBags;
             stepAt_ = now;
             return BehaviorStatus::Running;
         }
 
-        const auto slot = std::find_if(slots.begin(), slots.end(), [&](const UiBagSlot& candidate) { return !looked_.contains(candidate.token); });
+        if (const auto found = scannedItems_.find(pending_.front().name); found != scannedItems_.end())
+        {
+            if (!moveTo(found->second.frame))
+            {
+                return BehaviorStatus::Running;
+            }
+
+            slot_ = found->second;
+            step_ = Step::Read;
+            stepAt_ = now;
+            return BehaviorStatus::Running;
+        }
+
+        const auto slot = std::find_if(bagSlots_.begin(), bagSlots_.end(), [&](const UiBagSlot& candidate) { return !looked_.contains(candidate.token); });
 
         // Gone from the bags (sold, used, put on by the player): nothing to do.
-        if (slot == slots.end() || countOf(s, pending_.front().itemId) == 0)
+        if (slot == bagSlots_.end() || countOf(s, pending_.front().itemId) == 0)
         {
             return next(ctx);
         }
@@ -280,14 +310,33 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         {
             if (now - stepAt_ > kNoTooltip)
             {
+                const auto cached = scannedItems_.find(pending_.front().name);
+
+                if (slot_ && cached != scannedItems_.end() && cached->second.token == slot_->token)
+                {
+                    scannedItems_.erase(cached);
+                }
+
                 step_ = Step::Find;
             }
 
             return BehaviorStatus::Running;
         }
 
+        if (!item->name.empty())
+        {
+            scannedItems_[item->name] = *slot_;
+        }
+
         if (item->name != pending_.front().name)
         {
+            const auto cached = scannedItems_.find(pending_.front().name);
+
+            if (cached != scannedItems_.end() && cached->second.token == slot_->token)
+            {
+                scannedItems_.erase(cached);
+            }
+
             step_ = Step::Find;
             return BehaviorStatus::Running;
         }
@@ -295,6 +344,14 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         if (!isGear(*item))
         {
             notGear_.insert(item->name);
+            return next(ctx);
+        }
+
+        const int qualityFlag = autoEquipQualityFlag(item->quality);
+
+        if (qualityFlag == 0 || (ctx.config.autoEquipQualities & qualityFlag) == 0)
+        {
+            ctx.log.info(logcat::Loot, "auto equip: {} quality {} is not selected - left in the bags", item->name, item->quality);
             return next(ctx);
         }
 
@@ -309,6 +366,8 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             ctx.log.info(logcat::Loot, "auto equip: {} binds when equipped - left in the bags", item->name);
             return next(ctx);
         }
+
+        equippingBoE_ = bindsWhenEquipped(*item);
 
         // What is worn there: none shown, an empty slot. Two (rings, trinkets,
         // a second weapon): the worse of them is the one it would take over.
@@ -382,8 +441,17 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
 
         if (!item || !slot_ || item->owner != slot_->token || item->name != pending_.front().name)
         {
+            if (slot_)
+            {
+                const auto cached = scannedItems_.find(pending_.front().name);
+
+                if (cached != scannedItems_.end() && cached->second.token == slot_->token)
+                {
+                    scannedItems_.erase(cached);
+                }
+            }
+
             step_ = Step::Find;
-            looked_.clear();
             return BehaviorStatus::Running;
         }
 
@@ -414,16 +482,11 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return next(ctx);
         }
 
-        // Bind on Equip, and allowed: the client asks first.
-        if (ctx.uiFrameVisible("StaticPopup1") && ctx.uiFrameVisible("StaticPopup1Button1"))
+        // Bind on Equip, and allowed: the client asks first. It can use any
+        // of the four StaticPopup frames; accept only a bind question here.
+        if (equippingBoE_ && ctx.clickDialog("bind"))
         {
-            const auto text = ctx.provider->uiText("StaticPopup1", "StaticPopup1Text");
-
-            if (text && (text->find("bind") != std::string::npos || text->find("Bind") != std::string::npos))
-            {
-                ctx.clickUiFrame("StaticPopup1Button1");
-                return BehaviorStatus::Running;
-            }
+            return BehaviorStatus::Running;
         }
 
         if (now - stepAt_ > kEquipAnswer)

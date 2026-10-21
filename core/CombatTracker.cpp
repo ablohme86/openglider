@@ -149,8 +149,15 @@ void CombatTracker::update(const GameSnapshot& s, BotContext& ctx)
     if (ctx.combat.engaged)
     {
         const UnitState* u = s.findUnit(ctx.combat.engaged);
+        const auto blacklist = ctx.targetBlacklist.find(ctx.combat.engaged);
 
-        if (!u || (ctx.targetBlacklist.contains(ctx.combat.engaged) && !s.isAttacker(*u)))
+        // A blacklist that was harmless while the mob attacked us must not
+        // drop the engaged GUID on the first tick it flees. CombatBehavior
+        // needs that tick to remember the runner; a player-tagged mob is
+        // still left alone.
+        const bool taggedByOther = blacklist && blacklist->reason == "tagged by another player";
+
+        if (!u || (blacklist && !s.isAttacker(*u) && (!u->isFleeing || taggedByOther)))
         {
             ctx.combat.engaged = 0;
         }

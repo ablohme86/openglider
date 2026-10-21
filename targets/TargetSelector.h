@@ -208,8 +208,8 @@ public:
         dangerZones_ = std::move(zones);
     }
 
-    // Quest Mode: pull only these mobs (by entry), whatever the profile's target
-    // list says; empty goes by the profile again.
+    // Quest Mode: pull only these mobs (by entry), ignoring the grinding level
+    // bounds and profile target list; empty goes by the profile again.
     void setQuestMobs(std::vector<std::uint32_t> entries)
     {
         questMobs_ = std::move(entries);

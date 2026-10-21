@@ -220,6 +220,17 @@ bool CombatBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
         return true; // always defend
     }
 
+    // A runner can stop counting as an attacker and its engaged GUID can be
+    // cleared by CombatTracker. Keep the fight active while the runner we
+    // already saw fleeing is alive, so we can catch it when it stops running.
+    const UnitState* fled = s.findUnit(fled_);
+    const auto taggedByOther = [&](Guid guid)
+    {
+        const auto blacklist = ctx.targetBlacklist.find(guid);
+        return blacklist && blacklist->reason == "tagged by another player";
+    };
+    const bool keepFled = fled && fled->isAlive() && fled->reaction != Reaction::Friendly && !taggedByOther(fled->guid);
+
     // Followed: finish a fight under way, but start none.
     if (ctx.followerHold != 0 && !s.inCombat())
     {
@@ -231,7 +242,7 @@ bool CombatBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
     // way we chose to fight before it came for us (ClearPathBehavior).
     if (ctx.combat.engaged == 0)
     {
-        return false;
+        return keepFled && !ctx.combat.defendOnly;
     }
 
     if (ctx.combat.defendOnly && ctx.combat.engaged != ctx.combat.clearing)
@@ -240,7 +251,13 @@ bool CombatBehavior::canRun(const GameSnapshot& s, BotContext& ctx)
     }
 
     const UnitState* u = s.findUnit(ctx.combat.engaged);
-    return u && u->isAlive() && u->reaction != Reaction::Friendly && !ctx.targetBlacklist.contains(u->guid);
+    if (!u || !u->isAlive() || u->reaction == Reaction::Friendly)
+    {
+        return keepFled && !ctx.combat.defendOnly;
+    }
+
+    const bool keepRunner = !taggedByOther(u->guid) && (u->isFleeing || (keepFled && u->guid == fled_));
+    return !ctx.targetBlacklist.contains(u->guid) || keepRunner;
 }
 
 void CombatBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
@@ -347,6 +364,13 @@ Guid CombatBehavior::chooseTarget(const GameSnapshot& s, BotContext& ctx) const
         return e->guid;
     }
 
+    // CombatTracker may have dropped the engaged GUID while the runner was
+    // blacklisted and no longer counted as an attacker. Resume that chase.
+    if (const UnitState* f = s.findUnit(fled_); f && f->isAlive() && f->reaction != Reaction::Friendly)
+    {
+        return f->guid;
+    }
+
     if (!attackers.empty())
     {
         return attackers.front()->guid;
@@ -387,7 +411,7 @@ BehaviorStatus CombatBehavior::tick(const GameSnapshot& s, BotContext& ctx)
         pullGuid_ = 0;
         pullActionExecuted_ = false;
         autoRepeatStartedAt_.reset();
-        const bool defending = s.inCombat() || s.isAttacker(*unit);
+        const bool defending = s.inCombat() || s.isAttacker(*unit) || unit->guid == fled_;
         pullFinished_ = defending;
 
         if (!defending && ctx.combatClass)
@@ -409,7 +433,11 @@ BehaviorStatus CombatBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             tappedSince_ = ctx.now();
         }
 
-        const bool fightingIt = s.inCombat() && (pullActionExecuted_ || pullFinished_);
+        // A runner can drop the player's combat flag when it stops targeting
+        // us. That does not make a tag observed during our own fight theirs;
+        // keep the usual settle window while the mob is fleeing and just
+        // after it returns.
+        const bool fightingIt = (s.inCombat() || unit->isFleeing || unit->guid == fled_) && (pullActionExecuted_ || pullFinished_);
 
         if (!fightingIt || ctx.now() - tappedSince_ >= kTapSettle)
         {

@@ -528,6 +528,7 @@ public:
     BehaviorStatus tick(const GameSnapshot& s, BotContext& ctx) override;
     void onEnter(const GameSnapshot& s, BotContext& ctx) override;
     void onExit(BotContext& ctx) override;
+    void onYield(BotContext& ctx, std::string_view next) override;
 
 private:
     void discoverNearby(const GameSnapshot& s, BotContext& ctx);
@@ -1170,7 +1171,11 @@ private:
     std::map<std::uint32_t, int> seen_;
     bool seenOnce_ = false;
     std::vector<ItemStack> pending_;
-    // Names looked at already and not gear: not hovered for again.
+    // Bag slots scanned during this AutoEquip run, and where each item was
+    // found: two new items from one Auto Loot share this pass.
+    std::vector<UiBagSlot> bagSlots_;
+    std::map<std::string, UiBagSlot> scannedItems_;
+    // Names looked at already: not hovered for again while scanning this run.
     std::set<std::string> notGear_;
     // What was taken off for something better: back in the bags, not new,
     // and never put on again over it.
@@ -1180,7 +1185,8 @@ private:
     TimePoint stepAt_{};
     bool compareSet_ = false; // alwaysCompareItems typed this session
     bool bagsOpened_ = false; // opened by us, to be shut after
-    std::set<std::uint64_t> looked_; // bag buttons hovered for the item now
+    bool equippingBoE_ = false; // the client may ask to confirm binding this item
+    std::set<std::uint64_t> looked_; // bag buttons hovered during this run
     std::optional<UiBagSlot> slot_;
     int countBefore_ = 0;
 };
