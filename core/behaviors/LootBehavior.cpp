@@ -205,7 +205,18 @@ void LootBehavior::discoverNearby(const GameSnapshot& s, BotContext& ctx)
 
 void LootBehavior::onEnter(const GameSnapshot& s, BotContext& ctx)
 {
-    current_ = 0;
+    // Emergency healing can briefly take priority while a quest corpse is
+    // being approached. Resume that corpse (and its retry count) when Loot is
+    // selected again instead of starting the interaction over.
+    if (current_ != 0)
+    {
+        moveStarted_ = ctx.now();
+
+        if (const UnitState* corpse = s.findUnit(current_))
+        {
+            ctx.objectives.push(Objective{"LootCorpse", current_, corpse->position});
+        }
+    }
 
     if (const UnitState* t = s.target(); t && t->isAlive() && !s.isAttacker(*t))
     {
@@ -225,6 +236,22 @@ void LootBehavior::onExit(BotContext& ctx)
     ctx.cancelInteraction();
     ctx.restoreCamera();
     current_ = 0;
+}
+
+void LootBehavior::onYield(BotContext& ctx, std::string_view next)
+{
+    if (next == "Emergency" && current_ != 0)
+    {
+        // Keep the active corpse, retry count, and queued client interaction.
+        // Emergency may only run for one healing action; onExit() would
+        // discard that work and repeatedly restart the approach/loot attempt.
+        ctx.objectives.pop("LootCorpse");
+        ctx.navigator.stop();
+        ctx.restoreCamera();
+        return;
+    }
+
+    onExit(ctx);
 }
 
 void LootBehavior::selectNext(const GameSnapshot& s, BotContext& ctx)

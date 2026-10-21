@@ -631,7 +631,20 @@ void BotInstance::watchStrongMobs(const GameSnapshot& s)
     // standing where one of them would notice us is pulled. Not the ones
     // already fought or coming - there is no keeping away from those.
     std::vector<TargetSelector::DangerZone> dangerZones;
-    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
+    std::vector<std::uint32_t> questMobs;
+
+    if (config_.quest.enabled)
+    {
+        for (const QuestTarget& quest : context_.questTargets)
+        {
+            if (!quest.done)
+            {
+                questMobs.insert(questMobs.end(), quest.mobs.begin(), quest.mobs.end());
+            }
+        }
+    }
+
+    context_.strongMobs.update(s, config_.avoidStrongMobs ? targets_.config().maxLevel : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase, questMobs);
 
     context_.nearMobs.update(s, config_.addAvoidance ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max(), clock_->now(), config_.aggroRadiusBase);
 

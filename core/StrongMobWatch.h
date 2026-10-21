@@ -24,6 +24,7 @@
 #include "og/state/GameSnapshot.h"
 
 #include <map>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -46,10 +47,11 @@ struct StrongMob
     Vec3 heading() const;
 };
 
-// Keeps an eye on every hostile mob above the maximum mob level the client
-// shows: where each is, which way it walks and how near it notices the
-// character. The way is planned round them, a mob standing within their reach
-// is not pulled, and in a fight the character steps away from one that comes.
+// Keeps an eye on hostile mobs above the maximum mob level the client shows,
+// except current quest objectives: where each is, which way it walks and how
+// near it notices the character. The way is planned round them, a mob standing
+// within their reach is not pulled, and in a fight the character steps away
+// from one that comes.
 class StrongMobWatch
 {
 public:
@@ -62,7 +64,8 @@ public:
     // level above.
     static float aggroRange(int mobLevel, int playerLevel, float base = 20.0f);
 
-    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now, float aggroBase = 20.0f);
+    // Quest objectives are exempt from this grinding-level cap.
+    void update(const GameSnapshot& snapshot, int maxLevel, TimePoint now, float aggroBase = 20.0f, std::span<const std::uint32_t> questMobs = {});
     const std::vector<StrongMob>& mobs() const
     {
         return mobs_;

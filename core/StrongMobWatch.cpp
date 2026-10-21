@@ -55,7 +55,7 @@ float StrongMobWatch::aggroRange(int mobLevel, int playerLevel, float base)
     return std::clamp(base + static_cast<float>(mobLevel - playerLevel), 5.0f, 45.0f);
 }
 
-void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now, float aggroBase)
+void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now, float aggroBase, std::span<const std::uint32_t> questMobs)
 {
     mobs_.clear();
     spotted_.clear();
@@ -80,6 +80,13 @@ void StrongMobWatch::update(const GameSnapshot& s, int maxLevel, TimePoint now, 
         // Nor a player's pet ("Generic Hunter Pet", level 20, 200 yd off): it
         // fights only where its owner does.
         if (!u.isAttackable || u.name.starts_with("[DNT]") || u.ownerGuid != 0)
+        {
+            continue;
+        }
+
+        // Do not classify a current quest objective as too strong from a
+        // grinding level cap; quest objectives are handled by the target filter.
+        if (std::find(questMobs.begin(), questMobs.end(), u.entry) != questMobs.end())
         {
             continue;
         }

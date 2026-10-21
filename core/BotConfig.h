@@ -26,6 +26,34 @@
 namespace og
 {
 
+enum class AutoEquipQuality : int
+{
+    White = 1 << 0,
+    Green = 1 << 1,
+    Blue = 1 << 2 // Blue and rarer.
+};
+
+inline constexpr int kAllAutoEquipQualities = static_cast<int>(AutoEquipQuality::White) |
+                                               static_cast<int>(AutoEquipQuality::Green) |
+                                               static_cast<int>(AutoEquipQuality::Blue);
+inline constexpr int kDefaultAutoEquipQualities = static_cast<int>(AutoEquipQuality::White) |
+                                                    static_cast<int>(AutoEquipQuality::Green);
+
+constexpr int autoEquipQualityFlag(int itemQuality)
+{
+    if (itemQuality == 1)
+    {
+        return static_cast<int>(AutoEquipQuality::White);
+    }
+
+    if (itemQuality == 2)
+    {
+        return static_cast<int>(AutoEquipQuality::Green);
+    }
+
+    return itemQuality >= 3 ? static_cast<int>(AutoEquipQuality::Blue) : 0;
+}
+
 struct GatheringProfessionConfig
 {
     bool enabled = false;
@@ -406,6 +434,7 @@ struct BotConfig
     // right-click on it. `autoEquipSkipBoE`: never a Bind on Equip piece.
     bool autoEquip = false;
     bool autoEquipSkipBoE = true;
+    int autoEquipQualities = kDefaultAutoEquipQualities;
     // Sit down at campfires (General Settings, WoW Forever): to a campfire in
     // sight, sat by it until its Welcoming Campfire minute gives Camp Benefits.
     bool sitAtCampfires = false;

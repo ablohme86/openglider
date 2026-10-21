@@ -31,7 +31,8 @@ namespace og
 //   - remembers every unit we fought and detects when it dies (kill stats,
 //     TargetKilledEvent, pending loot)
 //   - tracks fight start/end
-//   - drops an engaged target that vanished or got blacklisted
+//   - drops an engaged target that vanished or was blacklisted and is no
+//     longer attacking or fleeing
 //   - prunes pending loot that can no longer be looted
 //   - stops an auto-attack left on a mob that is not fighting us
 class CombatTracker

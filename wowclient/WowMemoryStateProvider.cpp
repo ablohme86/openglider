@@ -2493,7 +2493,7 @@ std::optional<UiItemTooltip> WowMemoryStateProvider::tooltipOver(const UiFrame& 
         return std::nullopt;
     }
 
-    constexpr auto kPoll = std::chrono::milliseconds(25);
+    constexpr auto kPoll = std::chrono::milliseconds(15);
     constexpr int kPolls = 6;
     constexpr int kOwnAfter = 2; // the mouse was on this button already
     std::optional<UiItemTooltip> seen;
