@@ -215,6 +215,7 @@ void BotEngine::tick(const SnapshotObserver& beforeBehaviors)
         observer_(*snapshot);
     }
 
+    ctx_.controlsClient = state_ != EngineState::Paused || manualTravel_;
     combatTracker_.update(*snapshot, ctx_);
     ctx_.buffTracker.update(*snapshot, ctx_);
 
