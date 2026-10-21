@@ -249,16 +249,23 @@ BehaviorStatus AutoEquipBehavior::tick(const GameSnapshot& s, BotContext& ctx)
             return next(ctx);
         }
 
+        const auto slots = ctx.provider->uiBagSlots();
+        const auto sameSlot = [](const UiBagSlot& a, const UiBagSlot& b)
+        {
+            return a.token == b.token && a.frame.visible == b.frame.visible && a.frame.left == b.frame.left && a.frame.top == b.frame.top && a.frame.right == b.frame.right && a.frame.bottom == b.frame.bottom;
+        };
+        const bool slotLayoutChanged = slots.size() != bagSlots_.size() || !std::equal(slots.begin(), slots.end(), bagSlots_.begin(), bagSlots_.end(), sameSlot);
+
+        if (slotLayoutChanged)
+        {
+            bagSlots_ = slots;
+            looked_.clear();
+            scannedItems_.clear();
+            slot_.reset();
+        }
+
         if (bagSlots_.empty())
         {
-            bagSlots_ = ctx.provider->uiBagSlots();
-
-            if (!bagSlots_.empty())
-            {
-                stepAt_ = now;
-                return BehaviorStatus::Running;
-            }
-
             step_ = Step::OpenBags;
             stepAt_ = now;
             return BehaviorStatus::Running;
